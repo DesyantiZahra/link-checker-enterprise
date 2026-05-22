@@ -10,6 +10,16 @@ if (!isLoggedIn()) {
     exit;
 }
 
+// Normalisasi URL (tambahkan https:// jika tidak ada protocol)
+// Perlu dilakukan SEBELUM validasi filter_var agar URL tanpa protocol tetap bisa divalidasi setelah ditambah https://
+function normalizeUrl($url) {
+    $url = trim($url);
+    if (!preg_match('#^https?://#i', $url)) {
+        $url = 'https://' . $url;
+    }
+    return $url;
+}
+
 // Ambil URL dari request
 $input = json_decode(file_get_contents('php://input'), true);
 $url = trim($input['url'] ?? '');
@@ -18,6 +28,12 @@ if (empty($url)) {
     echo json_encode(['error' => 'URL tidak boleh kosong']);
     exit;
 }
+
+// Normalisasi URL sebelum validasi & scan
+$url = normalizeUrl($url);
+
+// Catat URL asli dari pengguna untuk ditampilkan di hasil
+$originalUrl = $input['url'] ?? $url; // URL asli dari input pengguna
 
 if (!filter_var($url, FILTER_VALIDATE_URL)) {
     echo json_encode(['error' => 'Format URL tidak valid']);
@@ -90,33 +106,43 @@ if ($httpCode == 200) {
         $analysisId = $data['data']['id'] ?? null;
 
         if ($analysisId) {
-            // Tunggu scan selesai
-            sleep(15); // Increased wait time
-
+            // Poll hasil analisis (max 12 percobaan, interval 5 detik)
             $resultUrl = "https://www.virustotal.com/api/v3/analyses/{$analysisId}";
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $resultUrl);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, ["x-apikey: {$vtApiKey}"]);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-            $resultResponse = curl_exec($ch);
-            $resultHttpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
+            for ($attempt = 1; $attempt <= 12; $attempt++) {
+                if ($attempt > 1) {
+                    sleep(5);
+                }
+                $ch = curl_init();
+                curl_setopt($ch, CURLOPT_URL, $resultUrl);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, ["x-apikey: {$vtApiKey}"]);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+                $resultResponse = curl_exec($ch);
+                $resultHttpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
 
-            error_log("VT Analysis Response: HTTP $resultHttpCode");
+                error_log("VT Analysis Poll Attempt $attempt: HTTP $resultHttpCode");
 
-            if ($resultHttpCode == 200) {
-                $resultData = json_decode($resultResponse, true);
-                if (json_last_error() !== JSON_ERROR_NONE) {
-                    echo json_encode(['error' => 'Invalid JSON response from VirusTotal analysis']);
+                if ($resultHttpCode == 200) {
+                    $resultData = json_decode($resultResponse, true);
+                    if (json_last_error() !== JSON_ERROR_NONE) {
+                        error_log("VT Analysis Poll JSON error on attempt $attempt");
+                        if ($attempt < 12) continue;
+                        echo json_encode(['error' => 'Invalid JSON response from VirusTotal analysis']);
+                        exit;
+                    }
+                    if (isset($resultData['data']['attributes']['stats'])) {
+                        $stats = $resultData['data']['attributes']['stats'] ?? null;
+                        $results = $resultData['data']['attributes']['results'] ?? [];
+                        break;
+                    }
+                }
+
+                if ($attempt >= 12) {
+                    echo json_encode(['error' => "Gagal mendapatkan hasil scan. Timeout setelah $attempt percobaan. HTTP terakhir: $resultHttpCode"]);
                     exit;
                 }
-                $stats = $resultData['data']['attributes']['stats'] ?? null;
-                $results = $resultData['data']['attributes']['results'] ?? [];
-            } else {
-                echo json_encode(['error' => "Gagal mendapatkan hasil scan. HTTP Code: $resultHttpCode"]);
-                exit;
             }
         } else {
             echo json_encode(['error' => 'Gagal mendapatkan analysis ID dari VirusTotal']);
@@ -189,38 +215,64 @@ if (defined('URLSCAN_API_KEY') && URLSCAN_API_KEY && URLSCAN_API_KEY != 'MASUKKA
     $curlError = curl_error($ch);
     curl_close($ch);
     
+    error_log("URLScan Submit HTTP: $httpCode, Error: $curlError");
+
     if ($httpCode == 200) {
         $data = json_decode($response, true);
         $uuid = $data['uuid'] ?? null;
         
         if ($uuid) {
-            // Tunggu 10 detik untuk screenshot siap
-            sleep(10);
-            
+            // Poll hasil screenshot (max 8 percobaan, interval 5 detik)
             $resultUrl = "https://urlscan.io/api/v1/result/{$uuid}/";
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $resultUrl);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 20);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, ['API-Key: ' . URLSCAN_API_KEY]);
-            
-            $resultResponse = curl_exec($ch);
-            $resultHttpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
-            
-            if ($resultHttpCode == 200) {
-                $resultData = json_decode($resultResponse, true);
-                // Cek berbagai struktur possible dari response
-                if (!empty($resultData['task']['screenshot'])) {
-                    $screenshotUrl = $resultData['task']['screenshot'];
-                } elseif (!empty($resultData['screenshot'])) {
-                    $screenshotUrl = $resultData['screenshot'];
-                } elseif (!empty($resultData['data']['screenshot'])) {
-                    $screenshotUrl = $resultData['data']['screenshot'];
+            for ($attempt = 1; $attempt <= 8; $attempt++) {
+                if ($attempt > 1) {
+                    sleep(5);
+                }
+                $ch = curl_init();
+                curl_setopt($ch, CURLOPT_URL, $resultUrl);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, ['API-Key: ' . URLSCAN_API_KEY]);
+                $resultResponse = curl_exec($ch);
+                $resultHttpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+                
+                error_log("URLScan Poll Attempt $attempt: HTTP $resultHttpCode");
+                
+                if ($resultHttpCode == 200) {
+                    $resultData = json_decode($resultResponse, true);
+                    if (json_last_error() !== JSON_ERROR_NONE) {
+                        error_log("URLScan Poll JSON error on attempt $attempt");
+                        continue;
+                    }
+                    // Periksa berbagai struktur response dari URLScan.io
+                    if (!empty($resultData['task']['screenshot'])) {
+                        $screenshotUrl = $resultData['task']['screenshot'];
+                        error_log("URLScan screenshot found in task.screenshot on attempt $attempt");
+                        break;
+                    } elseif (!empty($resultData['screenshot'])) {
+                        $screenshotUrl = $resultData['screenshot'];
+                        error_log("URLScan screenshot found in root.screenshot on attempt $attempt");
+                        break;
+                    } elseif (!empty($resultData['data']['screenshot'])) {
+                        $screenshotUrl = $resultData['data']['screenshot'];
+                        error_log("URLScan screenshot found in data.screenshot on attempt $attempt");
+                        break;
+                    } else {
+                        error_log("URLScan screenshot not ready on attempt $attempt. Keys: " . implode(', ', array_keys($resultData)));
+                    }
+                }
+                
+                if ($attempt >= 8) {
+                    error_log("URLScan polling timeout after $attempt attempts. Last HTTP: $resultHttpCode");
                 }
             }
+        } else {
+            error_log("URLScan submit response missing uuid. Response: " . substr($response, 0, 500));
         }
+    } else {
+        error_log("URLScan submit failed. HTTP: $httpCode, Error: $curlError");
     }
 }
 

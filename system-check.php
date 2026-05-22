@@ -46,7 +46,7 @@ try {
         if (in_array('engine_results', $columns)) {
             $success[] = "✅ engine_results column exists";
         } else {
-            $warnings[] = "⚠️ engine_results column missing (run update-db-screenshot.php)";
+            $warnings[] = "⚠️ engine_results column missing (run install-migration.php)";
         }
     } else {
         $errors[] = "❌ Missing columns: " . implode(', ', $missingCols);
@@ -107,11 +107,11 @@ if (is_writable('.')) {
                 <?php endforeach; ?>
             </ul>
             
-            <?php if (in_array("⚠️ engine_results column missing (run update-db-screenshot.php)", $warnings)): ?>
+            <?php if (in_array("⚠️ engine_results column missing (run install-migration.php)", $warnings)): ?>
             <div class="mt-4">
                 <p class="text-sm text-yellow-700 mb-2">Jalankan update database:</p>
-                <a href="update-db-screenshot.php" class="inline-block bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded transition">
-                    ▶️ Run Update Database
+                <a href="install-migration.php" class="inline-block bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded transition">
+                    ▶️ Run Migration
                 </a>
             </div>
             <?php endif; ?>
@@ -135,7 +135,7 @@ if (is_writable('.')) {
             <ol class="list-decimal list-inside space-y-2 text-blue-700">
                 <li>Pastikan MySQL running</li>
                 <li>Check API keys di <code class="bg-white px-2 py-1 rounded">includes/config.php</code></li>
-                <li>Run <code class="bg-white px-2 py-1 rounded">update-db-screenshot.php</code> jika ada warning database</li>
+                <li>Run <code class="bg-white px-2 py-1 rounded">install-migration.php</code> jika ada warning database</li>
                 <li>Cek koneksi internet</li>
                 <li>Lihat browser console untuk error detail (F12)</li>
             </ol>
@@ -146,7 +146,7 @@ if (is_writable('.')) {
             <a href="index.php" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition">
                 ← Kembali ke Dashboard
             </a>
-            <a href="update-db-screenshot.php" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded transition">
+            <a href="install-migration.php" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded transition">
                 Update Database
             </a>
         </div>

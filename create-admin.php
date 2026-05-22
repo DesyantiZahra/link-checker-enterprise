@@ -4,7 +4,8 @@ require_once 'includes/db.php';
 $pdo = getDB();
 
 // Hapus user admin lama
-$pdo->exec("DELETE FROM users WHERE username = 'admin'");
+$stmt = $pdo->prepare("DELETE FROM users WHERE username = ?");
+$stmt->execute(['admin']);
 
 // Buat password hash untuk "admin123"
 $password = 'admin123';

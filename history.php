@@ -49,16 +49,40 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $histories = $stmt->fetchAll();
 
-// Hitung statistik untuk ditampilkan
-$totalStmt = $pdo->prepare("SELECT COUNT(*) as total FROM scan_history WHERE user_id = ?");
-$totalStmt->execute([$user['id']]);
+// Hitung total dengan filter yang sama (untuk display "X dari Y")
+$totalSql = "SELECT COUNT(*) as total FROM scan_history WHERE user_id = ?";
+$totalParams = [$user['id']];
+if ($filter === 'safe') {
+    $totalSql .= " AND status = 'safe'";
+} elseif ($filter === 'suspicious') {
+    $totalSql .= " AND status = 'suspicious'";
+} elseif ($filter === 'malicious') {
+    $totalSql .= " AND status = 'malicious'";
+}
+if (!empty($search)) {
+    $totalSql .= " AND (url LIKE ? OR final_url LIKE ?)";
+    $totalParams[] = "%$search%";
+    $totalParams[] = "%$search%";
+}
+$totalStmt = $pdo->prepare($totalSql);
+$totalStmt->execute($totalParams);
 $totalCount = $totalStmt->fetch()['total'];
+
+// Hitung jumlah per status untuk ditampilkan di tombol filter
+$cntStmt = $pdo->prepare("SELECT status, COUNT(*) as cnt FROM scan_history WHERE user_id = ? GROUP BY status");
+$cntStmt->execute([$user['id']]);
+$cntAll = $safeCnt = $suspCnt = $malCnt = 0;
+foreach ($cntStmt->fetchAll() as $row) {
+    if ($row['status'] === 'safe')       $safeCnt  = (int)$row['cnt'];
+    elseif ($row['status'] === 'suspicious') $suspCnt = (int)$row['cnt'];
+    elseif ($row['status'] === 'malicious')  $malCnt  = (int)$row['cnt'];
+    $cntAll += (int)$row['cnt'];
+}
 
 $message = '';
 if (isset($_GET['deleted'])) {
     $message = '<div class="bg-green-100 border border-green-400 text-green-700 px-4 py-2 rounded mb-4">✅ 1 riwayat berhasil dihapus</div>';
-}
-if (isset($_GET['deleted_all'])) {
+} elseif (isset($_GET['deleted_all'])) {
     $message = '<div class="bg-green-100 border border-green-400 text-green-700 px-4 py-2 rounded mb-4">✅ Semua riwayat berhasil dihapus</div>';
 }
 ?>
@@ -124,10 +148,18 @@ if (isset($_GET['deleted_all'])) {
 
         <!-- Filter dan Search -->
         <div class="flex flex-wrap gap-2 mb-4">
-            <a href="?filter=all" class="px-3 py-1 rounded text-sm <?= $filter === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700' ?>">Semua (<?= $totalCount ?>)</a>
-            <a href="?filter=safe" class="px-3 py-1 rounded text-sm <?= $filter === 'safe' ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700' ?>">🟢 Aman</a>
-            <a href="?filter=suspicious" class="px-3 py-1 rounded text-sm <?= $filter === 'suspicious' ? 'bg-yellow-600 text-white' : 'bg-gray-200 text-gray-700' ?>">🟡 Mencurigakan</a>
-            <a href="?filter=malicious" class="px-3 py-1 rounded text-sm <?= $filter === 'malicious' ? 'bg-red-600 text-white' : 'bg-gray-200 text-gray-700' ?>">🔴 Berbahaya</a>
+            <a href="?filter=all" class="px-3 py-1 rounded text-sm <?= $filter === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700' ?>">
+                Semua <?= $filter === 'all' ? "($cntAll)" : '' ?>
+            </a>
+            <a href="?filter=safe" class="px-3 py-1 rounded text-sm <?= $filter === 'safe' ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700' ?>">
+                🟢 Aman <?= $filter === 'safe' ? "($safeCnt)" : '' ?>
+            </a>
+            <a href="?filter=suspicious" class="px-3 py-1 rounded text-sm <?= $filter === 'suspicious' ? 'bg-yellow-600 text-white' : 'bg-gray-200 text-gray-700' ?>">
+                🟡 Mencurigakan <?= $filter === 'suspicious' ? "($suspCnt)" : '' ?>
+            </a>
+            <a href="?filter=malicious" class="px-3 py-1 rounded text-sm <?= $filter === 'malicious' ? 'bg-red-600 text-white' : 'bg-gray-200 text-gray-700' ?>">
+                🔴 Berbahaya <?= $filter === 'malicious' ? "($malCnt)" : '' ?>
+            </a>
         </div>
 
         <form method="GET" class="mb-6">
@@ -138,7 +170,7 @@ if (isset($_GET['deleted_all'])) {
                 <input type="hidden" name="filter" value="<?= $filter ?>">
                 <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">🔍 Cari</button>
                 <?php if (!empty($search)): ?>
-                    <a href="history.php?filter=<?= $filter ?>" class="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400">Reset</a>
+                    <a href="history.php" class="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400">Reset (Semua <?= $cntAll ?>)</a>
                 <?php endif; ?>
             </div>
         </form>
@@ -158,12 +190,12 @@ if (isset($_GET['deleted_all'])) {
                     <table class="w-full">
                         <thead class="bg-gray-100">
                             <tr>
-                                <th class="px-4 py-3 text-left text-sm">Waktu</th>
+                                <th class="px-4 py-3 text-left text-sm whitespace-nowrap">Waktu</th>
                                 <th class="px-4 py-3 text-left text-sm">URL</th>
                                 <th class="px-4 py-3 text-center text-sm">Skor</th>
                                 <th class="px-4 py-3 text-center text-sm">Status</th>
                                 <th class="px-4 py-3 text-center text-sm">Engine</th>
-                                <th class="px-4 py-3 text-center text-sm">Aksi</th>
+                                <th class="px-4 py-3 text-center text-sm whitespace-nowrap" style="min-width:260px;">Aksi</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -211,11 +243,28 @@ if (isset($_GET['deleted_all'])) {
                                         ?>
                                     </td>
                                     <td class="px-4 py-3 text-center whitespace-nowrap text-sm">
-                                        <a href="detail.php?id=<?= $h['id'] ?>" class="text-blue-600 hover:underline mr-2">📋 Detail</a>
-                                        <?php if ($h['screenshot_url']): ?>
-                                            <a href="view-screenshot.php?id=<?= $h['id'] ?>" class="text-purple-600 hover:underline mr-2">📸</a>
-                                        <?php endif; ?>
-                                        <button onclick="confirmDelete(<?= $h['id'] ?>)" class="text-red-600 hover:text-red-800">🗑️</button>
+                                        <div class="flex items-center justify-center gap-1">
+                                            <a href="detail.php?id=<?= $h['id'] ?>" 
+                                               class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 text-xs font-medium transition"
+                                               title="Lihat Detail">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                                Detail
+                                            </a>
+                                            <?php if ($h['screenshot_url']): ?>
+                                            <a href="view-screenshot.php?id=<?= $h['id'] ?>" 
+                                               class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-purple-50 text-purple-700 hover:bg-purple-100 hover:text-purple-800 text-xs font-medium transition"
+                                               title="Lihat Screenshot">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                                                Screenshot
+                                            </a>
+                                            <?php endif; ?>
+                                            <button onclick="confirmDelete(<?= $h['id'] ?>)" 
+                                                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 text-xs font-medium transition"
+                                                    title="Hapus Ripwayat">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                                                Hapus
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>

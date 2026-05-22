@@ -54,10 +54,6 @@ function isAdmin() {
     return isset($_SESSION['role']) && $_SESSION['role'] === 'admin';
 }
 
-function isAdminUser() {
-    return isset($_SESSION['username']) && $_SESSION['username'] === 'admin';
-}
-
 function requireAuth() {
     if (!isLoggedIn()) {
         header('Location: login.php');
@@ -72,7 +68,7 @@ function requireAuth() {
 
 function requireAdmin() {
     requireAuth();
-    if (!isAdmin() && !isAdminUser()) {
+    if (!isAdmin()) {
         header('Location: index.php');
         exit;
     }
@@ -84,11 +80,23 @@ function logout() {
     exit;
 }
 
+function generateCsrfToken() {
+    if (empty($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf_token'];
+}
+
+function verifyCsrfToken($token) {
+    return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $token);
+}
+
 function getCurrentUser() {
     if (!isLoggedIn()) return null;
     
     $pdo = getDB();
     $stmt = $pdo->prepare("SELECT id, username, email, role, created_at, last_login FROM users WHERE id = ?");
     $stmt->execute([$_SESSION['user_id']]);
-    return $stmt->fetch();
+    $user = $stmt->fetch();
+    return $user ?: null;
 }

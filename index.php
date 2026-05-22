@@ -8,6 +8,45 @@ $pdo = getDB();
 $stmt = $pdo->prepare("SELECT COUNT(*) as total, SUM(CASE WHEN status='safe' THEN 1 ELSE 0 END) as safe, SUM(CASE WHEN status='suspicious' THEN 1 ELSE 0 END) as suspicious, SUM(CASE WHEN status='malicious' THEN 1 ELSE 0 END) as malicious FROM scan_history WHERE user_id = ?");
 $stmt->execute([$user['id']]);
 $stats = $stmt->fetch();
+
+// Statistik 7 hari terakhir untuk grafik tren
+$stmt = $pdo->prepare("
+    SELECT DATE(scanned_at) as tgl,
+           SUM(CASE WHEN status='safe'        THEN 1 ELSE 0 END) as safe,
+           SUM(CASE WHEN status='suspicious'  THEN 1 ELSE 0 END) as suspicious,
+           SUM(CASE WHEN status='malicious'   THEN 1 ELSE 0 END) as malicious
+    FROM scan_history
+    WHERE user_id = ? AND scanned_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+    GROUP BY DATE(scanned_at) ORDER BY tgl ASC
+");
+$stmt->execute([$user['id']]);
+$trendRaw = $stmt->fetchAll();
+
+// Susun array 7 hari (isi 0 untuk hari tanpa data)
+$trendLabels = [];
+$trendSafe = $trendSuspicious = $trendMalicious = [];
+for ($i = 6; $i >= 0; $i--) {
+    $d = date('Y-m-d', strtotime("-$i days"));
+    $trendLabels[] = date('d M', strtotime($d));
+    $found = false;
+    foreach ($trendRaw as $row) {
+        if ($row['tgl'] === $d) {
+            $trendSafe[]       = (int)$row['safe'];
+            $trendSuspicious[] = (int)$row['suspicious'];
+            $trendMalicious[]  = (int)$row['malicious'];
+            $found = true;
+            break;
+        }
+    }
+    if (!$found) {
+        $trendSafe[] = 0; $trendSuspicious[] = 0; $trendMalicious[] = 0;
+    }
+}
+
+// Distribusi status untuk pie chart
+$safeCount       = (int)($stats['safe']       ?? 0);
+$suspiciousCount = (int)($stats['suspicious'] ?? 0);
+$maliciousCount  = (int)($stats['malicious']  ?? 0);
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -16,6 +55,7 @@ $stats = $stmt->fetch();
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - <?= APP_NAME ?></title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         .loading { display: none; text-align: center; padding: 20px; }
         .result-card { transition: all 0.3s ease; margin-top: 20px; }
@@ -99,6 +139,23 @@ $stats = $stmt->fetch();
                 </div>
             </div>
         </div>
+
+        <!-- Grafik Statistik -->
+        <?php if ($stats['total'] > 0): ?>
+        <div class="bg-white rounded-xl shadow-lg p-6 mt-8">
+            <h3 class="font-semibold text-gray-700 mb-4">📈 Grafik Statistik</h3>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div>
+                    <h4 class="text-sm font-medium text-gray-600 mb-2">Tren 7 Hari Terakhir</h4>
+                    <canvas id="trendChart"></canvas>
+                </div>
+                <div>
+                    <h4 class="text-sm font-medium text-gray-600 mb-2">Distribusi Status</h4>
+                    <canvas id="pieChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
     </div>
 
     <script>
@@ -144,21 +201,20 @@ $stats = $stmt->fetch();
         });
 
         function showResult(data) {
+            // Gunakan status dari API yang sudah dihitung dengan benar
+            const status = data.status || 'safe';
             const score = data.safety_score;
             const maliciousCount = data.malicious_count || 0;
-            const isSafe = score > 90 && maliciousCount === 0;
-            const isSuspicious = score >= 50 && score <= 70;
-            const isMalicious = score < 40;
             
             let statusColor, statusText, statusIcon, bgColor, borderColor;
             
-            if (isMalicious) {
+            if (status === 'malicious') {
                 statusColor = 'red';
                 statusText = 'BERBAHAYA';
                 statusIcon = '🔴';
                 bgColor = 'bg-red-50';
                 borderColor = 'border-red-500';
-            } else if (isSuspicious) {
+            } else if (status === 'suspicious') {
                 statusColor = 'yellow';
                 statusText = 'MENURIGAKAN';
                 statusIcon = '🟡';
@@ -224,11 +280,11 @@ $stats = $stmt->fetch();
                             <h2 class="text-xl font-bold text-gray-800">Status: ${statusText}</h2>
                         </div>
                         <div class="text-right">
-                            <div class="text-3xl font-bold ${isMalicious ? 'text-red-600' : (isSuspicious ? 'text-yellow-600' : 'text-green-600')}">
+                            <div class="text-3xl font-bold ${status === 'malicious' ? 'text-red-600' : (status === 'suspicious' ? 'text-yellow-600' : 'text-green-600')}">
                                 ${data.safety_score}/100
                             </div>
                             <div class="text-sm text-gray-500">Skor Keamanan</div>
-                            ${isSafe ? '<div class="text-xs text-green-600 mt-1">Skor > 90 = Aman</div>' : (isSuspicious ? '<div class="text-xs text-yellow-600 mt-1">Skor 50-70 = Mencurigakan</div>' : '<div class="text-xs text-red-600 mt-1">Skor < 40 = Berbahaya</div>')}
+                            ${status === 'safe' ? '<div class="text-xs text-green-600 mt-1">Skor > 90 = Aman</div>' : (status === 'suspicious' ? '<div class="text-xs text-yellow-600 mt-1">Skor 50-70 = Mencurigakan</div>' : '<div class="text-xs text-red-600 mt-1">Skor < 40 = Berbahaya</div>')}
                         </div>
                     </div>
                     
@@ -271,28 +327,30 @@ $stats = $stmt->fetch();
                             </div>
                         </div>
                         
-                        <div class="p-3 rounded-lg ${isMalicious ? 'bg-red-200' : (isSuspicious ? 'bg-yellow-200' : 'bg-green-200')}">
+                        <div class="p-3 rounded-lg ${status === 'malicious' ? 'bg-red-200' : (status === 'suspicious' ? 'bg-yellow-200' : 'bg-green-200')}">
                             <p class="font-medium text-sm">
-                                ${isMalicious ? '⚠️ PERINGATAN: Link ini telah dilaporkan berbahaya oleh beberapa engine antivirus. JANGAN dibuka!' : 
-                                  (isSuspicious ? '⚠️ HATI-HATI: Link ini mencurigakan. Sebaiknya jangan dibuka tanpa kehati-hatian.' : 
-                                   '✅ AMAN: Tidak ada engine antivirus yang melaporkan link ini sebagai berbahaya.')}
+                                ${status === 'malicious' ? '⚠️ PERINGATAN: Link ini telah dilaporkan berbahaya oleh beberapa engine antivirus. JANGAN dibuka!' : 
+                                  (status === 'suspicious' ? '⚠️ HATI-HATI: Link ini mencurigakan. Sebaiknya jangan dibuka tanpa kehati-hatian.' : 
+                                  '✅ AMAN: Tidak ada engine antivirus yang melaporkan link ini sebagai berbahaya.')}
                             </p>
                         </div>
                         
-                        ${engineHtml}
+                         ${engineHtml}
                         
                         ${data.screenshot_url ? `
                         <div class="mt-6 pt-4 border-t">
                             <h3 class="font-semibold text-gray-700 mb-3">📸 Screenshot Website</h3>
                             <div class="bg-gray-50 rounded-lg p-3 overflow-x-auto">
-                                <img src="${data.screenshot_url}" alt="Website Screenshot" class="max-w-full border rounded-lg shadow-md" style="max-height: 600px;">
+                                <img src="${data.screenshot_url}" alt="Website Screenshot" class="max-w-full border rounded-lg shadow-md" style="max-height: 600px;" onerror="this.parentElement.innerHTML='<p class=\\'text-yellow-600 text-sm\\'>⚠️ Gambar screenshot tidak dapat dimuat. Kemungkinan domain ini diblokir oleh URLScan.io atau screenshot masih dalam proses.</p>'; this.style.display='none';">
                             </div>
                             <p class="text-xs text-gray-400 mt-2">Screenshot diambil oleh URLScan.io</p>
                         </div>
-                        ` : ''}
+                        ` : `<div class="mt-6 pt-4 border-t">
+                            <p class="text-xs text-yellow-600 bg-yellow-50 p-3 rounded">ℹ️ Screenshot tidak tersedia. Domain ini mungkin ditolak oleh URLScan.io atau screenshot masih dalam proses generate. Cek halaman riwayat beberapa saat lagi.</p>
+                        </div>`}
                         
                         <div class="flex gap-3 mt-2">
-                            <a href="history.php" class="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded transition">📋 Lihat Riwayat</a>
+                            <a href="detail.php?id=${data.scan_id}" class="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded transition">📋 Lihat Detail</a>
                             <button onclick="clearResult()" class="text-sm bg-gray-300 hover:bg-gray-400 px-3 py-1 rounded transition">🗑️ Tutup</button>
                         </div>
                         
@@ -332,6 +390,39 @@ $stats = $stmt->fetch();
                 return m;
             });
         }
+
+        // ====== CHARTS ======
+        <?php if ($stats['total'] > 0): ?>
+        // Line chart: tren 7 hari
+        const trendCtx = document.getElementById('trendChart');
+        if (trendCtx) {
+            new Chart(trendCtx, {
+                type: 'line',
+                data: {
+                    labels: <?= json_encode($trendLabels) ?>,
+                    datasets: [
+                        { label: 'Aman', data: <?= json_encode($trendSafe) ?>, borderColor: '#22c55e', tension: 0.3, fill: false },
+                        { label: 'Mencurigakan', data: <?= json_encode($trendSuspicious) ?>, borderColor: '#eab308', tension: 0.3, fill: false },
+                        { label: 'Berbahaya', data: <?= json_encode($trendMalicious) ?>, borderColor: '#ef4444', tension: 0.3, fill: false }
+                    ]
+                },
+                options: { responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+            });
+        }
+
+        // Pie chart: distribusi status
+        const pieCtx = document.getElementById('pieChart');
+        if (pieCtx) {
+            new Chart(pieCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Aman', 'Mencurigakan', 'Berbahaya'],
+                    datasets: [{ data: [<?= $safeCount ?>, <?= $suspiciousCount ?>, <?= $maliciousCount ?>], backgroundColor: ['#22c55e', '#eab308', '#ef4444'], borderWidth: 0 }]
+                },
+                options: { responsive: true, cutout: '60%', plugins: { legend: { position: 'bottom' } } }
+            });
+        }
+        <?php endif; ?>
     </script>
 </body>
 </html>

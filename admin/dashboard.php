@@ -9,7 +9,7 @@ $pdo = getDB();
 $stmt = $pdo->query("
     SELECT 
         COUNT(DISTINCT u.id) as total_users,
-        COUNT(s.id) as total_scans,
+        COUNT(DISTINCT s.id) as total_scans,
         SUM(CASE WHEN s.status = 'malicious' THEN 1 ELSE 0 END) as malicious_scans
     FROM users u
     LEFT JOIN scan_history s ON u.id = s.user_id

@@ -32,13 +32,24 @@ if (isset($_GET['download']) && $scan['screenshot_url']) {
     header('Content-Type: application/octet-stream');
     header('Content-Disposition: attachment; filename="' . $filename . '"');
     
-    $stream = @fopen($imageUrl, 'rb');
-    if ($stream !== false) {
-        while (!feof($stream)) {
-            echo fread($stream, 8192);
-        }
-        fclose($stream);
+    set_time_limit(60);
+    $maxBytes = 10485760; // 10 MB max
+
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $imageUrl);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    curl_setopt($ch, CURLOPT_NOPROGRESS, false);
+    $data = curl_exec($ch);
+    curl_close($ch);
+
+    if ($data === false || strlen($data) > $maxBytes) {
+        echo "Failed to retrieve screenshot or file too large.";
+        exit;
     }
+    echo $data;
     exit;
 }
 ?>

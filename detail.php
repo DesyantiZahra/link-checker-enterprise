@@ -31,6 +31,7 @@ if (!empty($scan['engine_results'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Detail Scan - <?= APP_NAME ?></title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 </head>
 <body class="bg-gray-100">
     <nav class="bg-white shadow-md">
@@ -251,16 +252,66 @@ if (!empty($scan['engine_results'])) {
                 <?php endif; ?>
 
                 <!-- Tombol Aksi -->
-                <div class="flex gap-3 pt-4">
+                <div class="flex flex-wrap gap-3 pt-4">
                     <a href="index.php" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition text-sm">🔄 Scan Baru</a>
                     <a href="history.php" class="bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded transition text-sm">📋 Kembali ke Riwayat</a>
+                    <button onclick="downloadPDF()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded transition text-sm">📄 Download PDF</button>
                 </div>
 
                 <p class="text-xs text-gray-400 text-center pt-4">
                     Scan ID: <?= $scan['id'] ?> | Waktu: <?= date('d/m/Y H:i:s', strtotime($scan['scanned_at'])) ?>
                 </p>
-            </div>
-        </div>
-    </div>
-</body>
+             </div>
+         </div>
+     </div>
+     <script>
+         const scanData = {
+             id: <?= $scan['id'] ?>,
+             url: <?= json_encode($scan['url']) ?>,
+             scanned_at: <?= json_encode($scan['scanned_at']) ?>,
+             safety_score: <?= (int)$scan['safety_score'] ?>,
+             status: <?= json_encode($scan['status']) ?>,
+             malicious_count: <?= (int)$scan['malicious_count'] ?>,
+             suspicious_count: <?= (int)$scan['suspicious_count'] ?>,
+             harmless_count: <?= (int)$scan['harmless_count'] ?>,
+             undetected_count: <?= (int)$scan['undetected_count'] ?>,
+             total_engines: <?= (int)$scan['total_engines'] ?>,
+             screenshot_url: <?= json_encode($scan['screenshot_url'] ?? '') ?>,
+             details: <?= json_encode($details) ?>
+         };
+
+         function downloadPDF() {
+             const { jsPDF } = window.jspdf;
+             const doc = new jsPDF();
+             const d = scanData;
+             let y = 20;
+
+             doc.setFontSize(18);
+             doc.text('Hasil Scan Link Checker', 20, y);
+             y += 8;
+
+             doc.setFontSize(11);
+             doc.text('URL: ' + d.url, 20, y); y += 6;
+             doc.text('Waktu Scan: ' + d.scanned_at, 20, y); y += 6;
+             doc.text('Skor Keamanan: ' + d.safety_score + '/100   Status: ' + d.status.toUpperCase(), 20, y); y += 10;
+
+             doc.setFontSize(13);
+             doc.text('Hasil Engine:', 20, y); y += 7;
+             doc.setFontSize(10);
+             doc.text('Malicious: ' + d.malicious_count + '   Suspicious: ' + d.suspicious_count + '   Harmless: ' + d.harmless_count + '   Undetected: ' + d.undetected_count, 20, y); y += 10;
+
+             if (d.details && d.details.length > 0) {
+                 doc.setFontSize(13);
+                 doc.text('Detail Engine (' + d.details.length + '):', 20, y); y += 7;
+                 doc.setFontSize(9);
+                 d.details.forEach(function(e) {
+                     if (y > 270) { doc.addPage(); y = 20; }
+                     doc.text(e.engine + ' - ' + e.category.toUpperCase(), 25, y); y += 5;
+                 });
+             }
+
+             doc.save('scan-' + d.id + '.pdf');
+         }
+     </script>
+ </body>
 </html>
