@@ -9,137 +9,150 @@ Aplikasi **Enterprise Link Checker** adalah platform untuk memeriksa keamanan UR
 - ✅ Skor keamanan (0-100)
 - ✅ Penyimpanan riwayat seumur hidup
 - ✅ Export ke CSV
+- ✅ Export laporan scan ke PDF
+- ✅ Grafik tren statistik 7 hari (Chart.js)
+- ✅ Filter & pencarian riwayat
+- ✅ Panel Admin untuk melihat statistik semua user
 
 ---
 
-## 🚀 Quick Start - Akses Fitur
+## 🚀 Quick Start
 
-### 1️⃣ **Halaman Utama**
+### Setup Awal
+
+1. Jalankan **XAMPP** (Apache + MySQL)
+2. Jalankan migrasi database: buka `install-migration.php` di browser
+3. Buka `system-check.php` untuk memverifikasi instalasi
+4. Login di `login.php` dengan akun default
+
+### 1️⃣ Halaman Utama / Dashboard
 
 ```
-http://localhost:8080/link-checker-enterprise/
+http://localhost/link-checker-enterprise/index.php
 ```
 
 - Masuk dengan akun Anda
-- Demo: admin@linkchecker.local / admin123
+- Demo: `admin` / `admin123` atau `user` / `user123`
 
-### 2️⃣ **Dashboard - Scan URL**
+### 2️⃣ Scan URL Baru
 
 ```
-http://localhost:8080/link-checker-enterprise/index.php
+http://localhost/link-checker-enterprise/index.php
 ```
 
-- **Fitur**: Scan URL baru dengan 70+ engine antivirus
-- **Output**: Skor keamanan, detail engine, screenshot
+- **Fitur**: Scan URL dengan 70+ engine antivirus + screenshot
+- **Output**: Skor keamanan, detail engine, screenshot, grafik tren
 - **Waktu**: 10-15 detik per scan
 
-### 3️⃣ **Riwayat Scan**
+### 3️⃣ Riwayat Scan
 
 ```
-http://localhost:8080/link-checker-enterprise/history.php
+http://localhost/link-checker-enterprise/history.php
 ```
 
 - **Filter**: Semua, Aman, Mencurigakan, Berbahaya
 - **Search**: Cari berdasarkan URL
 - **Export**: Download ke CSV
-- **Actions**: Lihat detail, screenshot, atau hapus
+- **Actions**: Lihat detail, screenshot, hapus riwayat
 
-### 4️⃣ **Lihat Screenshot Website**
-
-```
-http://localhost:8080/link-checker-enterprise/view-screenshot.php?id=1
-```
-
-- **Fitur**: Preview visual website
-- **Download**: Simpan screenshot ke komputer
-- **Redirect**: Buka website di tab baru
-
-### 5️⃣ **Export Riwayat ke CSV**
+### 4️⃣ Detail Scan & Export PDF
 
 ```
-http://localhost:8080/link-checker-enterprise/api/export-csv.php
+http://localhost/link-checker-enterprise/detail.php?id=1
+```
+
+- **Fitur**: Ringkasan lengkap hasil scan
+- **Export**: Download laporan scan ke PDF
+- **Detail Engine**: Lihat hasil deteksi per engine antivirus
+
+### 5️⃣ Lihat Screenshot Website
+
+```
+http://localhost/link-checker-enterprise/view-screenshot.php?id=1
+```
+
+- **Fitur**: Preview dan download screenshot website
+- **Redirect**: Buka website di URLScan.io
+
+### 6️⃣ Export Riwayat ke CSV
+
+```
+http://localhost/link-checker-enterprise/api/export-csv.php
 ```
 
 - **Format**: CSV (dapat dibuka di Excel)
 - **Isi**: ID, Waktu, URL, Skor, Status, Engine, Screenshot
-- **Untuk**: Analisis dan laporan
 
-### 6️⃣ **Fitur Enterprise (Roadmap)**
-
-```
-http://localhost:8080/link-checker-enterprise/features.php
-```
-
-- Lihat fitur yang sudah ada
-- Lihat fitur yang akan datang
-- Priority & effort estimation
-- Roadmap implementasi
-
-### 7️⃣ **Panduan Penggunaan**
+### 7️⃣ Admin Panel
 
 ```
-http://localhost:8080/link-checker-enterprise/guide.php
+http://localhost/link-checker-enterprise/admin/dashboard.php
 ```
 
-- Tutorial step-by-step
-- FAQ lengkap
-- Tips & trik
-- Troubleshooting
+- Akses hanya untuk user dengan role `admin`
+- **Fitur**: Statistik semua user, total scan, scan berbahaya
 
-### 8️⃣ **Overview & Quick Start**
+### 8️⃣ Profil & Pengaturan
 
 ```
-http://localhost:8080/link-checker-enterprise/overview.php
+http://localhost/link-checker-enterprise/profile.php
 ```
 
-- Ringkasan semua fitur
-- Scan terbaru
-- Statistik
-- Peta navigasi
+- Lihat info akun, ubah password
 
-### 9️⃣ **Profil & Pengaturan**
+### 9️⃣ Setup & Troubleshooting
 
 ```
-http://localhost:8080/link-checker-enterprise/profile.php
+http://localhost/link-checker-enterprise/system-check.php
 ```
 
-- Lihat info akun
-- Ubah password
-- Setting akun
+- Cek koneksi database, API key, PHP extensions
+- Panduan troubleshooting langsung dari halaman
+
+### 🔟 Buat Ulang User Admin
+
+```
+http://localhost/link-checker-enterprise/create-admin.php
+```
+
+- Hapus dan buat ulang user admin jika lupa password
 
 ---
 
-## 📊 Fitur Sekarang (Phase 1)
+## 📊 Fitur Yang Aktif
 
-| Fitur               | Status | Keterangan             |
-| ------------------- | ------ | ---------------------- |
-| Scan Multi-Engine   | ✅     | 70+ antivirus engine   |
-| Screenshot Website  | ✅     | URLScan.io integration |
-| Skor Keamanan       | ✅     | 0-100 scale            |
-| Riwayat Scan        | ✅     | Unlimited storage      |
-| Filter & Search     | ✅     | By status & URL        |
-| Export CSV          | ✅     | Download history       |
-| User Authentication | ✅     | Bcrypt password        |
-| Multi-user          | ✅     | Separate workspaces    |
+| Fitur                | Status | Keterangan |
+|----------------------|--------|------------|
+| Scan Multi-Engine    | ✅     | 70+ antivirus engine via VirusTotal v3 |
+| Screenshot Website   | ✅     | URLScan.io integration dengan polling loop |
+| Skor Keamanan        | ✅     | 0-100 scale |
+| Riwayat Scan         | ✅     | Unlimited storage, filter, search |
+| Export CSV           | ✅     | Download history dengan UTF-8 BOM |
+| Export PDF           | ✅     | Download laporan scan per-ID |
+| Grafik Statistik     | ✅     | Tren 7 hari & distribusi status (Chart.js) |
+| User Authentication  | ✅     | Bcrypt + CSRF token |
+| Multi-user           | ✅     | Separate workspaces per user |
+| Admin Panel          | ✅     | Statistik semua user & scan global |
+| Engine Detail        | ✅     | Hasil deteksi per engine antivirus |
 
 ---
 
-## 🎯 Fitur Enterprise (Coming Soon)
+## 🎯 Fitur Yang Akan Datang (Roadmap)
 
-### Phase 2 (Bulan 3-4)
+### Phase 2
 
 - ⏳ Scheduled Scanning (scan otomatis berkala)
 - ⏳ Email Notifications
 - ⏳ Advanced Analytics Dashboard
 - ⏳ API Endpoints
 
-### Phase 3 (Bulan 5-6)
+### Phase 3
 
 - ⏳ Team Collaboration
 - ⏳ Subscription Plans
 - ⏳ Payment Integration
 
-### Phase 4 (Bulan 7+)
+### Phase 4
 
 - ⏳ Browser Extension
 - ⏳ Mobile App
@@ -149,27 +162,75 @@ http://localhost:8080/link-checker-enterprise/profile.php
 
 ## 🔐 Keamanan
 
-- **Password**: Dienkripsi dengan bcrypt (industry standard)
-- **Session**: PHP session dengan token
+- **Password**: Dienkripsi dengan bcrypt (PASSWORD_DEFAULT)
+- **Session**: PHP session dengan CSRF token pada form login
 - **Database**: MySQL dengan prepared statements (SQL injection protection)
-- **User Data**: Isolated per user ID
-- **API Keys**: Aman di environment variables
+- **User Data**: Isolated per user ID (`user_id` foreign key)
+- **API Keys**: Dikonfigurasi di `includes/config.php`
+- **Admin Check**: Diakses hanya jika `$_SESSION['role'] === 'admin'`
+- **HTML Escaping**: Semua output pengguna di-escape dengan `htmlspecialchars()`
 
 ---
 
 ## 💾 Database Schema
 
+### Tabel `users`
+
 ```sql
--- Users
-users (id, username, email, password_hash, role, created_at, last_login)
+id, username (UNIQUE), email (UNIQUE), password_hash, role ENUM('admin','user'), created_at, last_login
+```
 
--- Scan History
-scan_history (id, user_id, url, malicious_count, suspicious_count,
-              harmless_count, undetected_count, total_engines,
-              safety_score, status, screenshot_url, scanned_at)
+### Tabel `scan_history`
 
--- Personal Blocklist (optional)
-personal_blocklist (id, user_id, domain, type, created_at)
+```sql
+id, user_id (FK→users), url, final_url, malicious_count, suspicious_count,
+harmless_count, undetected_count, total_engines, safety_score,
+status ENUM('safe','suspicious','malicious','error'),
+vt_scan_id, screenshot_url, engine_results (LONGTEXT JSON), response_time_ms, scanned_at
+```
+
+### Tabel `personal_blocklist`
+
+```sql
+id, user_id (FK→users), domain, type ENUM('trusted','blocked'), notes, created_at
+```
+
+---
+
+## 📁 Struktur File
+
+```
+link-checker-enterprise/
+├── index.php              # Dashboard + form scan + grafik tren
+├── login.php              # Login dengan CSRF token
+├── register.php           # Registrasi user baru
+├── history.php            # Riwayat scan (filter, search, export, styled actions)
+├── detail.php             # Detail scan + download PDF
+├── profile.php            # Profil & pengaturan akun
+├── view-screenshot.php    # Lihat / download screenshot
+├── features.php           # Roadmap fitur
+├── guide.php              # Panduan penggunaan & FAQ
+├── overview.php           # Ringkasan fitur
+├── logout.php             # Logout
+├── create-admin.php       # Tool buat ulang user admin
+├── install-migration.php  # Migrasi DB (ganti database.sql & update-db-screenshot.php)
+├── system-check.php       # Cek status sistem (DB, API key, PHP extensions)
+├── test-scan.php          # File testing scan
+├── test-screenshot.php    # File testing screenshot
+├── database.sql           # SQL schema (referensi)
+├── README.md              # Dokumentasi ini
+│
+├── admin/
+│   └── dashboard.php      # Admin panel (total user, total scan, scan berbahaya)
+│
+├── api/
+│   ├── scan.php           # Endpoint scan (polling loop VT + URLScan)
+│   └── export-csv.php     # Export riwayat ke CSV
+│
+├── includes/
+│   ├── config.php         # Konfigurasi (DB, API keys, APP_URL)
+│   ├── db.php             # Koneksi PDO database
+│   └── auth.php           # Auth: login, register, CSRF, requireAuth, requireAdmin
 ```
 
 ---
@@ -179,77 +240,39 @@ personal_blocklist (id, user_id, domain, type, created_at)
 File: `includes/config.php`
 
 ```php
-// VirusTotal API
-define('VT_API_KEY', 'YOUR_API_KEY');
-
-// URLScan.io API (untuk screenshot)
-define('URLSCAN_API_KEY', 'YOUR_API_KEY');
-
 // Database
 define('DB_HOST', 'localhost');
+define('DB_PORT', '3306');
 define('DB_NAME', 'link_checker');
 define('DB_USER', 'root');
 define('DB_PASS', '');
+
+// VirusTotal API v3
+define('VT_API_KEY', 'YOUR_API_KEY');
+
+// URLScan.io API
+define('URLSCAN_API_KEY', 'YOUR_API_KEY');
+
+// Aplikasi
+define('APP_NAME', 'Enterprise Link Checker');
+define('APP_URL', 'http://localhost/link-checker-enterprise');
 ```
 
 ---
 
-## 📁 Struktur File
+## 🧪 Akun Demo
+
+| Role  | Username  | Email                       | Password  |
+|-------|-----------|-----------------------------|-----------|
+| Admin | `admin`   | admin@linkchecker.local     | `admin123`|
+| User  | `user`    | user@linkchecker.local      | `user123` |
+
+### URL Test
 
 ```
-link-checker-enterprise/
-├── index.php                          # Dashboard
-├── login.php                          # Login page
-├── register.php                       # Register page
-├── history.php                        # Scan history
-├── profile.php                        # User profile
-├── view-screenshot.php                # Screenshot viewer
-├── features.php                       # Feature roadmap
-├── guide.php                          # User guide
-├── overview.php                       # Overview
-├── logout.php                         # Logout
-│
-├── api/
-│   ├── scan.php                       # Scan API endpoint
-│   └── export-csv.php                 # Export to CSV
-│
-├── admin/
-│   └── dashboard.php                  # Admin panel
-│
-├── includes/
-│   ├── config.php                     # Configuration
-│   ├── db.php                         # Database connection
-│   └── auth.php                       # Authentication functions
-│
-├── database.sql                       # SQL schema
-└── README.md                          # This file
-```
-
----
-
-## 🎨 UI Features
-
-- **Modern Dashboard**: Tailwind CSS responsive design
-- **Dark Mode Support**: (Coming in Phase 2)
-- **Mobile Responsive**: Works on smartphone, tablet, desktop
-- **Real-time Updates**: AJAX for scan results
-- **Progress Indicator**: Show scanning progress
-
----
-
-## 🧪 Testing
-
-### Test Accounts
-
-- **Admin**: admin@linkchecker.local / admin123
-- **User Demo**: user@linkchecker.local / user123
-
-### Test URLs
-
-```
-https://google.com          # Safe
-https://example.com         # Safe
-https://httpbin.org         # Safe (API testing)
+https://google.com       # Safe
+https://example.com      # Safe
+https://httpbin.org      # Safe (API testing)
 ```
 
 ---
@@ -259,7 +282,8 @@ https://httpbin.org         # Safe (API testing)
 - **Scan Time**: 10-15 detik (termasuk screenshot)
 - **Database Query**: < 100ms
 - **API Response**: < 5 detik (VirusTotal)
-- **Screenshot**: < 8 detik (URLScan.io)
+- **Screenshot**: < 8 detik (URLScan.io, dengan polling loop 8 iterasi)
+- **Polling Strategy**: Kedua API (VT & URLScan) menggunakan polling loop bukan `sleep()` tetap
 
 ---
 
@@ -267,29 +291,33 @@ https://httpbin.org         # Safe (API testing)
 
 ### Screenshot tidak muncul?
 
-- Cek API key URLScan di `config.php`
-- Beberapa website ditolak oleh URLScan (Google, Facebook, dll)
-- Check error log di browser console
+1. Cek API key URLScan di `includes/config.php`
+2. Beberapa website ditolak oleh URLScan (Google, Facebook, dll)
+3. Jalankan `install-migration.php` untuk memastikan kolom database lengkap
+4. Cek error di browser console (F12)
 
 ### Scan gagal?
 
-- Pastikan API key VirusTotal aktif
-- Check internet connection
-- Lihat error message di halaman
+1. Pastikan API key VirusTotal aktif
+2. Cek koneksi internet
+3. Buka `system-check.php` untuk diagnostik otomatis
 
 ### Database error?
 
-- Pastikan MySQL running
-- Check credentials di `config.php`
-- Run `database.sql` untuk update schema
+1. Pastikan MySQL running di XAMPP
+2. Cek kredensial di `includes/config.php`
+3. Jalankan `install-migration.php` untuk setup ulang schema
+
+### Lupa password admin?
+
+1. Buka `create-admin.php` di browser untuk reset user admin
 
 ---
 
-## 📞 Support & Feedback
+## 📞 Dukungan
 
 - **Email**: support@linkchecker.local
-- **Feature Request**: Lihat halaman Features
-- **Bug Report**: Contact administrator
+- **Bug Report**: Hubungi administrator
 
 ---
 
@@ -299,21 +327,6 @@ Enterprise Link Checker - 2026
 
 ---
 
-## 🎓 Panduan Navigasi Cepat
-
-| Tujuan             | Link                       |
-| ------------------ | -------------------------- |
-| Scan URL baru      | `index.php`                |
-| Lihat riwayat      | `history.php`              |
-| Lihat screenshot   | `view-screenshot.php?id=1` |
-| Download CSV       | `api/export-csv.php`       |
-| Lihat fitur baru   | `features.php`             |
-| Belajar cara pakai | `guide.php`                |
-| Dashboard overview | `overview.php`             |
-| Pengaturan akun    | `profile.php`              |
-
----
-
-**Last Updated**: May 2, 2026
+**Last Updated**: 22 Mei 2026
 **Version**: 1.0 Beta
 **Status**: Production Ready
