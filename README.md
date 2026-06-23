@@ -25,6 +25,17 @@ Aplikasi **Enterprise Link Checker** adalah platform untuk memeriksa keamanan UR
 3. Buka `system-check.php` untuk memverifikasi instalasi
 4. Login di `login.php` dengan akun default
 
+## ⚙️ Konfigurasi Lokal
+
+Sebelum menjalankan aplikasi, pastikan file `includes/config.php` berisi pengaturan database dan API key lokal Anda. File ini sudah ada di `.gitignore` sehingga tidak akan dikirim ke GitHub.
+
+- `DB_HOST`: biasanya `localhost`
+- `DB_NAME`: `link_checker`
+- `DB_USER`: biasanya `root`
+- `DB_PASS`: kosong untuk XAMPP default
+- `VT_API_KEY`: memasukkan API key VirusTotal Anda
+- `URLSCAN_API_KEY`: opsional untuk screenshot via URLScan.io
+
 ### 1️⃣ Halaman Utama / Dashboard
 
 ```

@@ -1,1 +1,27 @@
+# OS
+Thumbs.db
+Desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Logs and databases
+*.log
+*.sql
+
+# Local environment files
+.env
+.env.local
+.env.*.local
+
+# PHP dependencies
+/vendor/
+composer.phar
+
+# Node dependencies
+node_modules/
+
+# Local config (contains DB credentials and API keys)
 includes/config.php
