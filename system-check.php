@@ -2,6 +2,7 @@
 require_once 'includes/config.php';
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+requireAdmin();
 
 $errors = [];
 $warnings = [];
@@ -81,11 +82,20 @@ if (is_writable('.')) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>System Status - <?= APP_NAME ?></title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔗</text></svg>">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>tailwind.config={darkMode:'class',theme:{extend:{fontFamily:{sans:['Inter','sans-serif']}}}}</script>
+    <style>.btn-hover{transition:all .15s ease}.btn-hover:hover{transform:scale(1.02)}.btn-hover:active{transform:scale(.98)}.card-hover{transition:all .2s ease}.card-hover:hover{box-shadow:0 10px 25px -5px rgba(0,0,0,.1);transform:translateY(-2px)}</style>
 </head>
-<body class="bg-gray-100">
+<body class="bg-gray-100 dark:bg-gray-900 dark:text-gray-100">
     <div class="container mx-auto px-6 py-8 max-w-2xl">
-        <h1 class="text-3xl font-bold text-gray-800 mb-6">🔧 System Status Check</h1>
+        <div class="flex items-center justify-between mb-6">
+            <h1 class="text-3xl font-bold text-gray-800 dark:text-gray-100">🔧 System Status Check</h1>
+            <button onclick="toggleDark()" class="text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:text-gray-100 dark:hover:text-gray-100 text-lg" title="Toggle Dark Mode">
+                <span id="darkIcon">🌙</span>
+            </button>
+        </div>
 
         <?php if (!empty($errors)): ?>
         <div class="bg-red-50 border-l-4 border-red-500 rounded-lg p-6 mb-6">
@@ -110,9 +120,12 @@ if (is_writable('.')) {
             <?php if (in_array("⚠️ engine_results column missing (run install-migration.php)", $warnings)): ?>
             <div class="mt-4">
                 <p class="text-sm text-yellow-700 mb-2">Jalankan update database:</p>
-                <a href="install-migration.php" class="inline-block bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded transition">
-                    ▶️ Run Migration
-                </a>
+                <form method="POST" action="install-migration.php">
+                    <input type="hidden" name="csrf_token" value="<?= generateCsrfToken() ?>">
+                    <button type="submit" class="inline-block bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white px-4 py-2 rounded-lg btn-hover shadow-sm cursor-pointer">
+                        ▶️ Run Migration
+                    </button>
+                </form>
             </div>
             <?php endif; ?>
         </div>
@@ -143,13 +156,36 @@ if (is_writable('.')) {
 
         <!-- Navigation -->
         <div class="mt-8 flex gap-3">
-            <a href="index.php" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition">
+            <a href="index.php" class="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 py-2 rounded-lg btn-hover shadow-sm">
                 ← Kembali ke Dashboard
             </a>
-            <a href="install-migration.php" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded transition">
-                Update Database
-            </a>
+            <form method="POST" action="install-migration.php" style="display:inline">
+                <input type="hidden" name="csrf_token" value="<?= generateCsrfToken() ?>">
+                <button type="submit" class="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-4 py-2 rounded-lg btn-hover shadow-sm cursor-pointer">
+                    Update Database
+                </button>
+            </form>
         </div>
     </div>
+    <footer class="bg-gray-100 dark:bg-gray-850 border-t border-gray-200 dark:border-gray-700 mt-12 py-6">
+        <div class="container mx-auto px-6 text-center">
+            <p class="text-gray-500 dark:text-gray-400 text-sm">🔍 <?= APP_NAME ?> v2.0 &copy; <?= date('Y') ?></p>
+
+        </div>
+    </footer>
+    <script>
+        if (localStorage.getItem('darkMode') === 'enabled') {
+            document.documentElement.classList.add('dark');
+            document.getElementById('darkIcon').textContent = '☀️';
+        }
+        function toggleDark() {
+            const html = document.documentElement;
+            html.classList.toggle('dark');
+            const isDark = html.classList.contains('dark');
+            localStorage.setItem('darkMode', isDark ? 'enabled' : 'disabled');
+            document.getElementById('darkIcon').textContent = isDark ? '☀️' : '🌙';
+        }
+    </script>
 </body>
 </html>
+

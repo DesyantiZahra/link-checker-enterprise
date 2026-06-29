@@ -10,12 +10,26 @@
  *   1. Buat database   link_checker   (jika belum ada)
  *   2. Buat tabel      users
  *   3. Buat tabel      scan_history  (lengkap dengan semua kolom + indeks)
- *   4. Buat tabel      personal_blocklist
- *   5. Tambahkan user admin   (admin / admin123)
- *   6. Tambahkan user demo    (user  / user123)
+ *   4. Tambahkan user admin   (admin / admin123)
+ *   5. Tambahkan user demo    (user  / user123)
  * ============================================================
  */
 require_once __DIR__ . '/includes/config.php';
+require_once __DIR__ . '/includes/auth.php';
+requireAdmin();
+
+// Hanya bisa diakses via POST dengan CSRF token
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    die('Access denied. File ini hanya bisa diakses via form.');
+}
+if (empty($_POST['csrf_token']) || !verifyCsrfToken($_POST['csrf_token'])) {
+    die('Permintaan tidak sah. CSRF token tidak valid.');
+}
+
+// Hanya bisa diakses dari localhost
+if ($_SERVER['REMOTE_ADDR'] !== '127.0.0.1' && $_SERVER['REMOTE_ADDR'] !== '::1') {
+    die('Access denied. Hanya bisa diakses dari localhost.');
+}
 
 try {
     // ── 1. Buat database ────────────────────────────────────
@@ -73,28 +87,13 @@ try {
     ");
     echo "✅ Tabel <code>scan_history</code> siap<br>";
 
-    // ── Tabel personal_blocklist ─────────────────────────────
-    $pdo->exec("
-        CREATE TABLE IF NOT EXISTS personal_blocklist (
-            id        INT PRIMARY KEY AUTO_INCREMENT,
-            user_id   INT          NOT NULL,
-            domain    VARCHAR(255) NOT NULL,
-            type      ENUM('trusted','blocked') DEFAULT 'blocked',
-            notes     TEXT,
-            created_at TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE KEY unique_user_domain (user_id, domain),
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    ");
-    echo "✅ Tabel <code>personal_blocklist</code> siap<br>";
-
-    // ── 5 & 6. Tambahkan user default (jika belum ada) ───────
+    // ── 4 & 5. Tambahkan user default (jika belum ada) ───────
     $stmt = $pdo->query("SELECT COUNT(*) FROM users WHERE username = 'admin'");
     if ($stmt->fetchColumn() == 0) {
         $hash = password_hash('admin123', PASSWORD_DEFAULT);
         $pdo->prepare("INSERT INTO users (username,email,password_hash,role) VALUES (?,?,?,?)")
             ->execute(['admin', 'admin@linkchecker.local', $hash, 'admin']);
-        echo "✅ User <strong>admin</strong> dibuat (password: admin123)<br>";
+        echo "✅ User <strong>admin</strong> berhasil dibuat<br>";
     } else {
         echo "ℹ️  User <strong>admin</strong> sudah ada, tidak ditimpa<br>";
     }
@@ -104,7 +103,7 @@ try {
         $hash = password_hash('user123', PASSWORD_DEFAULT);
         $pdo->prepare("INSERT INTO users (username,email,password_hash,role) VALUES (?,?,?,?)")
             ->execute(['user', 'user@linkchecker.local', $hash, 'user']);
-        echo "✅ User <strong>user</strong> dibuat (password: user123)<br>";
+        echo "✅ User <strong>user</strong> berhasil dibuat<br>";
     } else {
         echo "ℹ️  User <strong>user</strong> sudah ada, tidak ditimpa<br>";
     }

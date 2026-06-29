@@ -38,23 +38,11 @@ CREATE TABLE IF NOT EXISTS scan_history (
     INDEX idx_url (url(191))
 );
 
--- Tabel personal_blocklist (opsional)
-CREATE TABLE IF NOT EXISTS personal_blocklist (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    user_id INT NOT NULL,
-    domain VARCHAR(255) NOT NULL,
-    type ENUM('trusted', 'blocked') DEFAULT 'blocked',
-    notes TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY unique_user_domain (user_id, domain),
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
-
 -- Insert user admin default (password: admin123)
 -- Password hash untuk "admin123" menggunakan bcrypt
 INSERT INTO users (username, email, password_hash, role) VALUES 
-('admin', 'admin@linkchecker.local', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin');
+('admin', 'admin@linkchecker.local', '$2y$10$w9gG.5sOhSvKv36tsg4bour0q5js7Ll1wnY1734/KKR93gGZChzTS', 'admin');
 
 -- Insert user demo biasa (password: user123)
 INSERT INTO users (username, email, password_hash, role) VALUES 
-('user', 'user@linkchecker.local', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'user');
+('user', 'user@linkchecker.local', '$2y$10$et5rC8qxdUf3X03KZx.AkuWKaByM5Haqw4s39YEdC1maFcV3lZUDO', 'user');

@@ -2,7 +2,7 @@
 
 ## 📌 Ringkasan Sistem
 
-Aplikasi **Enterprise Link Checker** adalah platform untuk memeriksa keamanan URL dengan menggunakan lebih dari 70 engine antivirus secara bersamaan. Setiap scan dilengkapi dengan:
+Aplikasi **Link Checker** adalah platform untuk memeriksa keamanan URL dengan menggunakan lebih dari 70 engine antivirus secara bersamaan. Setiap scan dilengkapi dengan:
 
 - ✅ Hasil dari 70+ engine antivirus (VirusTotal)
 - ✅ Screenshot website (URLScan.io)
@@ -39,7 +39,7 @@ Sebelum menjalankan aplikasi, pastikan file `includes/config.php` berisi pengatu
 ### 1️⃣ Halaman Utama / Dashboard
 
 ```
-http://localhost/link-checker-enterprise/index.php
+http://localhost/link-checker/index.php
 ```
 
 - Masuk dengan akun Anda
@@ -48,7 +48,7 @@ http://localhost/link-checker-enterprise/index.php
 ### 2️⃣ Scan URL Baru
 
 ```
-http://localhost/link-checker-enterprise/index.php
+http://localhost/link-checker/index.php
 ```
 
 - **Fitur**: Scan URL dengan 70+ engine antivirus + screenshot
@@ -58,7 +58,7 @@ http://localhost/link-checker-enterprise/index.php
 ### 3️⃣ Riwayat Scan
 
 ```
-http://localhost/link-checker-enterprise/history.php
+http://localhost/link-checker/history.php
 ```
 
 - **Filter**: Semua, Aman, Mencurigakan, Berbahaya
@@ -69,7 +69,7 @@ http://localhost/link-checker-enterprise/history.php
 ### 4️⃣ Detail Scan & Export PDF
 
 ```
-http://localhost/link-checker-enterprise/detail.php?id=1
+http://localhost/link-checker/detail.php?id=1
 ```
 
 - **Fitur**: Ringkasan lengkap hasil scan
@@ -79,7 +79,7 @@ http://localhost/link-checker-enterprise/detail.php?id=1
 ### 5️⃣ Lihat Screenshot Website
 
 ```
-http://localhost/link-checker-enterprise/view-screenshot.php?id=1
+http://localhost/link-checker/view-screenshot.php?id=1
 ```
 
 - **Fitur**: Preview dan download screenshot website
@@ -88,7 +88,7 @@ http://localhost/link-checker-enterprise/view-screenshot.php?id=1
 ### 6️⃣ Export Riwayat ke CSV
 
 ```
-http://localhost/link-checker-enterprise/api/export-csv.php
+http://localhost/link-checker/api/export-csv.php
 ```
 
 - **Format**: CSV (dapat dibuka di Excel)
@@ -97,7 +97,7 @@ http://localhost/link-checker-enterprise/api/export-csv.php
 ### 7️⃣ Admin Panel
 
 ```
-http://localhost/link-checker-enterprise/admin/dashboard.php
+http://localhost/link-checker/admin/dashboard.php
 ```
 
 - Akses hanya untuk user dengan role `admin`
@@ -106,7 +106,7 @@ http://localhost/link-checker-enterprise/admin/dashboard.php
 ### 8️⃣ Profil & Pengaturan
 
 ```
-http://localhost/link-checker-enterprise/profile.php
+http://localhost/link-checker/profile.php
 ```
 
 - Lihat info akun, ubah password
@@ -114,19 +114,13 @@ http://localhost/link-checker-enterprise/profile.php
 ### 9️⃣ Setup & Troubleshooting
 
 ```
-http://localhost/link-checker-enterprise/system-check.php
+http://localhost/link-checker/system-check.php
 ```
 
 - Cek koneksi database, API key, PHP extensions
 - Panduan troubleshooting langsung dari halaman
 
-### 🔟 Buat Ulang User Admin
 
-```
-http://localhost/link-checker-enterprise/create-admin.php
-```
-
-- Hapus dan buat ulang user admin jika lupa password
 
 ---
 
@@ -200,18 +194,12 @@ status ENUM('safe','suspicious','malicious','error'),
 vt_scan_id, screenshot_url, engine_results (LONGTEXT JSON), response_time_ms, scanned_at
 ```
 
-### Tabel `personal_blocklist`
-
-```sql
-id, user_id (FK→users), domain, type ENUM('trusted','blocked'), notes, created_at
-```
-
 ---
 
 ## 📁 Struktur File
 
 ```
-link-checker-enterprise/
+link-checker/
 ├── index.php              # Dashboard + form scan + grafik tren
 ├── login.php              # Login dengan CSRF token
 ├── register.php           # Registrasi user baru
@@ -222,12 +210,9 @@ link-checker-enterprise/
 ├── features.php           # Roadmap fitur
 ├── guide.php              # Panduan penggunaan & FAQ
 ├── overview.php           # Ringkasan fitur
-├── logout.php             # Logout
-├── create-admin.php       # Tool buat ulang user admin
-├── install-migration.php  # Migrasi DB (ganti database.sql & update-db-screenshot.php)
+├── logout.php             # Logout (via POST + CSRF)
+├── install-migration.php  # Migrasi DB
 ├── system-check.php       # Cek status sistem (DB, API key, PHP extensions)
-├── test-scan.php          # File testing scan
-├── test-screenshot.php    # File testing screenshot
 ├── database.sql           # SQL schema (referensi)
 ├── README.md              # Dokumentasi ini
 │
@@ -240,8 +225,10 @@ link-checker-enterprise/
 │
 ├── includes/
 │   ├── config.php         # Konfigurasi (DB, API keys, APP_URL)
+│   ├── config.example.php # Template konfigurasi (tanpa API key)
 │   ├── db.php             # Koneksi PDO database
-│   └── auth.php           # Auth: login, register, CSRF, requireAuth, requireAdmin
+│   ├── auth.php           # Auth: login, register, CSRF, requireAuth, requireAdmin
+│   └── helpers.php        # Fungsi bantu: getScanStatus, badge, label
 ```
 
 ---
@@ -266,7 +253,7 @@ define('URLSCAN_API_KEY', 'YOUR_API_KEY');
 
 // Aplikasi
 define('APP_NAME', 'Enterprise Link Checker');
-define('APP_URL', 'http://localhost/link-checker-enterprise');
+define('APP_URL', 'http://localhost/link-checker');
 ```
 
 ---
@@ -321,7 +308,8 @@ https://httpbin.org      # Safe (API testing)
 
 ### Lupa password admin?
 
-1. Buka `create-admin.php` di browser untuk reset user admin
+1. Hubungi administrator database untuk mereset password manual via SQL
+2. Atau jalankan ulang `install-migration.php` untuk reset user admin
 
 ---
 

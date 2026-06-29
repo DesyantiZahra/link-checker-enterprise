@@ -1,6 +1,7 @@
 <?php
 require_once 'includes/auth.php';
 require_once 'includes/db.php';
+require_once 'includes/helpers.php';
 $user = requireAuth();
 
 $scan_id = $_GET['id'] ?? 0;
@@ -30,24 +31,35 @@ if (!empty($scan['engine_results'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Detail Scan - <?= APP_NAME ?></title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔗</text></svg>">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>tailwind.config={darkMode:'class',theme:{extend:{fontFamily:{sans:['Inter','sans-serif']}}}}</script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <style>.btn-hover{transition:all .15s ease}.btn-hover:hover{transform:scale(1.02)}.btn-hover:active{transform:scale(.98)}.card-hover{transition:all .2s ease}.card-hover:hover{box-shadow:0 10px 25px -5px rgba(0,0,0,.1);transform:translateY(-2px)}@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}.fade-in{animation:fadeIn .3s ease forwards}</style>
 </head>
-<body class="bg-gray-100">
-    <nav class="bg-white shadow-md">
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+    <nav class="bg-white dark:bg-gray-800 shadow-md border-b border-gray-200 dark:border-gray-700">
         <div class="container mx-auto px-6 py-3">
             <div class="flex justify-between items-center">
-                <div class="text-xl font-semibold text-gray-700">🔍 <?= APP_NAME ?></div>
-                <div class="flex space-x-4">
-                    <a href="index.php" class="text-gray-600 hover:text-gray-800">Dashboard</a>
-                    <a href="history.php" class="text-gray-600 hover:text-gray-800">Riwayat</a>
-                    <?php if (isset($_SESSION['username']) && $_SESSION['username'] === 'admin'): ?>
-                        <a href="admin/dashboard.php" class="text-gray-600 hover:text-gray-800">Admin Panel</a>
+                <a href="index.php" class="text-xl font-semibold text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">🔍 <?= APP_NAME ?></a>
+                <div class="flex items-center space-x-4">
+                    <a href="index.php" class="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Dashboard</a>
+                    <a href="history.php" class="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Riwayat</a>
+                    <a href="guide.php" class="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Panduan</a>
+                    <?php if (isAdmin()): ?>
+                        <a href="admin/dashboard.php" class="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Admin Panel</a>
                     <?php endif; ?>
-                    <a href="profile.php" class="text-gray-600 hover:text-gray-800">Profil</a>
-                    <span class="text-gray-400">|</span>
-                    <span class="text-gray-600"><?= htmlspecialchars($_SESSION['username']) ?></span>
-                    <a href="logout.php" class="text-red-600 hover:text-red-800">Logout</a>
+                    <a href="profile.php" class="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Profil</a>
+                    <span class="text-gray-300 dark:text-gray-600">|</span>
+                    <span class="text-gray-600 dark:text-gray-300 text-sm"><?= htmlspecialchars($_SESSION['username']) ?></span>
+                    <button onclick="toggleDark()" class="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 text-lg transition-colors" title="Toggle Dark Mode">
+                        <span id="darkIcon">🌙</span>
+                    </button>
+                    <form method="POST" action="logout.php" class="inline">
+                        <input type="hidden" name="csrf_token" value="<?= generateCsrfToken() ?>">
+                        <button type="submit" class="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 cursor-pointer transition-colors font-medium">Logout</button>
+                    </form>
                 </div>
             </div>
         </div>
@@ -55,50 +67,31 @@ if (!empty($scan['engine_results'])) {
 
     <div class="container mx-auto px-6 py-8 max-w-4xl">
         <div class="flex justify-between items-center mb-6">
-            <h1 class="text-2xl font-bold text-gray-800">📋 Detail Scan</h1>
-            <a href="history.php" class="text-blue-600 hover:underline">← Kembali ke Riwayat</a>
+            <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-100">📋 Detail Scan</h1>
+            <a href="history.php" class="text-blue-600 dark:text-blue-400 hover:underline">← Kembali ke Riwayat</a>
         </div>
 
         <?php
         $score = (int)$scan['safety_score'];
         $maliciousCount = (int)$scan['malicious_count'];
+        $suspiciousCount = (int)$scan['suspicious_count'];
         
-        if ($score > 90 && $maliciousCount === 0) {
-            $displayStatus = 'safe';
-        } elseif ($score >= 50 && $score <= 70) {
-            $displayStatus = 'suspicious';
-        } elseif ($score < 40) {
-            $displayStatus = 'malicious';
-        } else {
-            // Score 40-49 atau 71-90
-            $displayStatus = $maliciousCount > 0 ? 'suspicious' : 'safe';
-        }
+        $displayStatus = getScanStatus($score, $maliciousCount, $suspiciousCount);
 
-        $statusColor = match($displayStatus) {
-            'safe' => 'green',
-            'suspicious' => 'yellow',
-            'malicious' => 'red',
-            default => 'gray'
-        };
-        
-        $statusText = match($displayStatus) {
-            'safe' => 'AMAN',
-            'suspicious' => 'MENURIGAKAN',
-            'malicious' => 'BERBAHAYA',
-            default => 'UNKNOWN'
-        };
-        
-        $statusIcon = match($displayStatus) {
-            'safe' => '🟢',
-            'suspicious' => '🟡',
-            'malicious' => '🔴',
-            default => '⚪'
-        };
+        $statusMap = [
+            'safe' => ['color' => 'green', 'text' => 'AMAN', 'icon' => '🟢'],
+            'suspicious' => ['color' => 'yellow', 'text' => 'MENCURIGAKAN', 'icon' => '🟡'],
+            'malicious' => ['color' => 'red', 'text' => 'BERBAHAYA', 'icon' => '🔴'],
+        ];
+        $statusInfo = $statusMap[$displayStatus] ?? ['color' => 'gray', 'text' => 'UNKNOWN', 'icon' => '⚪'];
+        $statusColor = $statusInfo['color'];
+        $statusText = $statusInfo['text'];
+        $statusIcon = $statusInfo['icon'];
         ?>
 
-        <div class="bg-white rounded-lg shadow p-6">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 card-hover">
             <!-- Header Status -->
-            <div class="bg-<?= $statusColor ?>-100 p-4 rounded-lg mb-6">
+            <div class="bg-<?= $statusColor ?>-100 dark:bg-<?= $statusColor ?>-900/30 p-4 rounded-lg mb-6">
                 <div class="flex items-center justify-between">
                     <div>
                         <div class="text-3xl mb-1"><?= $statusIcon ?></div>
@@ -106,7 +99,7 @@ if (!empty($scan['engine_results'])) {
                     </div>
                     <div class="text-right">
                         <div class="text-3xl font-bold text-<?= $statusColor ?>-600"><?= $scan['safety_score'] ?>/100</div>
-                        <div class="text-sm text-gray-500">Skor Keamanan</div>
+                        <div class="text-sm text-gray-500 dark:text-gray-400">Skor Keamanan</div>
                         <?php if ($displayStatus === 'safe'): ?>
                             <div class="text-xs text-green-600 mt-1">Skor > 90 = Aman</div>
                         <?php elseif ($displayStatus === 'suspicious'): ?>
@@ -121,62 +114,62 @@ if (!empty($scan['engine_results'])) {
             <!-- Informasi Scan -->
             <div class="space-y-4">
                 <div class="border-b pb-3">
-                    <p class="text-sm text-gray-500">Waktu Scan</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Waktu Scan</p>
                     <p class="font-medium"><?= date('d F Y H:i:s', strtotime($scan['scanned_at'])) ?></p>
                 </div>
                 
                 <div class="border-b pb-3">
-                    <p class="text-sm text-gray-500">URL yang Discan</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">URL yang Discan</p>
                     <p class="font-mono text-sm break-all bg-gray-50 p-2 rounded"><?= htmlspecialchars($scan['url']) ?></p>
                 </div>
                 
                 <?php if ($scan['final_url'] && $scan['final_url'] != $scan['url']): ?>
                 <div class="border-b pb-3">
-                    <p class="text-sm text-gray-500">URL Tujuan (setelah redirect)</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">URL Tujuan (setelah redirect)</p>
                     <p class="font-mono text-sm break-all bg-gray-50 p-2 rounded"><?= htmlspecialchars($scan['final_url']) ?></p>
                 </div>
                 <?php endif; ?>
 
                 <?php if (!empty($scan['screenshot_url'])): ?>
                 <div class="border-b pb-3">
-                    <p class="text-sm text-gray-500 mb-2">Screenshot Website</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mb-2">Screenshot Website</p>
                     <div class="rounded-lg overflow-hidden border border-gray-200">
                         <img src="<?= htmlspecialchars($scan['screenshot_url']) ?>" alt="Screenshot" class="w-full max-h-80 object-contain bg-gray-50">
                     </div>
                     <div class="mt-3 flex flex-wrap gap-2">
                         <a href="view-screenshot.php?id=<?= $scan['id'] ?>" class="bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700">Lihat Screenshot</a>
                         <a href="view-screenshot.php?id=<?= $scan['id'] ?>&download=1" class="bg-gray-700 text-white px-3 py-2 rounded text-sm hover:bg-gray-800">Download</a>
-                        <a href="<?= htmlspecialchars($scan['screenshot_url']) ?>" target="_blank" class="bg-gray-200 text-gray-700 px-3 py-2 rounded text-sm hover:bg-gray-300">Buka di URLScan</a>
+                        <a href="<?= htmlspecialchars($scan['screenshot_url']) ?>" target="_blank" class="bg-gray-200 text-gray-700 dark:text-gray-200 px-3 py-2 rounded text-sm hover:bg-gray-300">Buka di URLScan</a>
                     </div>
                 </div>
                 <?php endif; ?>
 
                 <!-- Hasil Scan Engine -->
                 <div class="border-b pb-3">
-                    <p class="text-sm text-gray-500 mb-2">Hasil Scan dari <?= $scan['total_engines'] ?> Engine Antivirus</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mb-2">Hasil Scan dari <?= $scan['total_engines'] ?> Engine Antivirus</p>
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                         <div class="text-center p-3 bg-red-100 rounded-lg">
                             <div class="text-2xl font-bold text-red-600"><?= $scan['malicious_count'] ?></div>
-                            <div class="text-xs text-gray-600">Malicious</div>
+                            <div class="text-xs text-gray-600 dark:text-gray-300">Malicious</div>
                         </div>
                         <div class="text-center p-3 bg-yellow-100 rounded-lg">
                             <div class="text-2xl font-bold text-yellow-600"><?= $scan['suspicious_count'] ?></div>
-                            <div class="text-xs text-gray-600">Suspicious</div>
+                            <div class="text-xs text-gray-600 dark:text-gray-300">Suspicious</div>
                         </div>
                         <div class="text-center p-3 bg-green-100 rounded-lg">
                             <div class="text-2xl font-bold text-green-600"><?= $scan['harmless_count'] ?></div>
-                            <div class="text-xs text-gray-600">Harmless</div>
+                            <div class="text-xs text-gray-600 dark:text-gray-300">Harmless</div>
                         </div>
                         <div class="text-center p-3 bg-gray-100 rounded-lg">
-                            <div class="text-2xl font-bold text-gray-600"><?= $scan['undetected_count'] ?></div>
-                            <div class="text-xs text-gray-600">Undetected</div>
+                            <div class="text-2xl font-bold text-gray-600 dark:text-gray-300"><?= $scan['undetected_count'] ?></div>
+                            <div class="text-xs text-gray-600 dark:text-gray-300">Undetected</div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Progress Bar -->
                 <div class="border-b pb-3">
-                    <p class="text-sm text-gray-500 mb-1">Visualisasi Keamanan</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Visualisasi Keamanan</p>
                     <?php 
                     $safePercent = $scan['total_engines'] > 0 ? (($scan['harmless_count'] + $scan['undetected_count']) / $scan['total_engines'] * 100) : 100;
                     $maliciousPercent = $scan['total_engines'] > 0 ? ($scan['malicious_count'] / $scan['total_engines'] * 100) : 0;
@@ -253,9 +246,9 @@ if (!empty($scan['engine_results'])) {
 
                 <!-- Tombol Aksi -->
                 <div class="flex flex-wrap gap-3 pt-4">
-                    <a href="index.php" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition text-sm">🔄 Scan Baru</a>
-                    <a href="history.php" class="bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded transition text-sm">📋 Kembali ke Riwayat</a>
-                    <button onclick="downloadPDF()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded transition text-sm">📄 Download PDF</button>
+                    <a href="index.php" class="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 py-2 rounded-lg btn-hover shadow-sm text-sm">🔄 Scan Baru</a>
+                    <a href="history.php" class="bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg transition text-sm">📋 Kembali ke Riwayat</a>
+                    <button onclick="downloadPDF()" class="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white px-4 py-2 rounded-lg btn-hover shadow-sm text-sm">📄 Download PDF</button>
                 </div>
 
                 <p class="text-xs text-gray-400 text-center pt-4">
@@ -313,5 +306,25 @@ if (!empty($scan['engine_results'])) {
              doc.save('scan-' + d.id + '.pdf');
          }
      </script>
+    <footer class="bg-gray-100 dark:bg-gray-850 border-t border-gray-200 dark:border-gray-700 mt-12 py-6">
+        <div class="container mx-auto px-6 text-center">
+            <p class="text-gray-500 dark:text-gray-400 text-sm">🔍 <?= APP_NAME ?> v2.0 &copy; <?= date('Y') ?></p>
+
+        </div>
+    </footer>
+    <script>
+        if (localStorage.getItem('darkMode') === 'enabled') {
+            document.documentElement.classList.add('dark');
+            document.getElementById('darkIcon').textContent = '☀️';
+        }
+        function toggleDark() {
+            const html = document.documentElement;
+            html.classList.toggle('dark');
+            const isDark = html.classList.contains('dark');
+            localStorage.setItem('darkMode', isDark ? 'enabled' : 'disabled');
+            document.getElementById('darkIcon').textContent = isDark ? '☀️' : '🌙';
+        }
+    </script>
  </body>
 </html>
+

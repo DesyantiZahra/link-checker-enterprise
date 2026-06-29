@@ -5,9 +5,25 @@ require_once '../includes/db.php';
 $user = requireAuth();
 $pdo = getDB();
 
-// Get all scans for the user
-$stmt = $pdo->prepare("SELECT * FROM scan_history WHERE user_id = ? ORDER BY scanned_at DESC");
-$stmt->execute([$user['id']]);
+$from = $_GET['from'] ?? '';
+$to = $_GET['to'] ?? '';
+
+$sql = "SELECT * FROM scan_history WHERE user_id = ?";
+$params = [$user['id']];
+
+if (!empty($from)) {
+    $sql .= " AND scanned_at >= ?";
+    $params[] = $from . ' 00:00:00';
+}
+if (!empty($to)) {
+    $sql .= " AND scanned_at <= ?";
+    $params[] = $to . ' 23:59:59';
+}
+
+$sql .= " ORDER BY scanned_at DESC";
+
+$stmt = $pdo->prepare($sql);
+$stmt->execute($params);
 $scans = $stmt->fetchAll();
 
 // Set headers for CSV download

@@ -9,7 +9,8 @@ Desktop.ini
 
 # Logs and databases
 *.log
-*.sql
+*backup.sql
+*dump.sql
 
 # Local environment files
 .env

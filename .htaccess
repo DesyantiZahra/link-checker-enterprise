@@ -1,0 +1,18 @@
+# ============================================
+# Proteksi akses langsung ke file sensitif
+# ============================================
+# File ini aman di-commit ke GitHub karena
+# tidak mengandung credential atau API key.
+# ============================================
+
+# Blok akses langsung ke file database, log, dan markdown
+<FilesMatch "\.(sql|md|log)$">
+    Deny from all
+</FilesMatch>
+
+# Blok akses langsung ke folder includes/ (berisi config & koneksi DB)
+# Catatan: require_once PHP tetap berfungsi karena berjalan di server-side
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^includes/ - [F,L]
+</IfModule>

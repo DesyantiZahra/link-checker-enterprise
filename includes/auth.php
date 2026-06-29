@@ -40,6 +40,8 @@ function loginUser($username, $password) {
         $_SESSION['username'] = $user['username'];
         $_SESSION['role'] = $user['role'];
         
+        session_regenerate_id(true);
+        
         return ['success' => true, 'user' => $user];
     }
     

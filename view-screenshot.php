@@ -1,6 +1,7 @@
 <?php
 require_once 'includes/auth.php';
 require_once 'includes/db.php';
+require_once 'includes/helpers.php';
 $user = requireAuth();
 
 $pdo = getDB();
@@ -27,7 +28,9 @@ if (!$scan) {
 if (isset($_GET['download']) && $scan['screenshot_url']) {
     $imageUrl = $scan['screenshot_url'];
     $timestamp = date('Y-m-d_His');
-    $filename = "screenshot_" . urlencode(parse_url($scan['url'], PHP_URL_HOST)) . "_" . $timestamp . ".png";
+    $host = parse_url($scan['url'], PHP_URL_HOST) ?: 'unknown';
+    $host = preg_replace('/[^a-zA-Z0-9.-]/', '_', $host);
+    $filename = "screenshot_{$host}_{$timestamp}.png";
     
     header('Content-Type: application/octet-stream');
     header('Content-Disposition: attachment; filename="' . $filename . '"');
@@ -39,7 +42,7 @@ if (isset($_GET['download']) && $scan['screenshot_url']) {
     curl_setopt($ch, CURLOPT_URL, $imageUrl);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, 30);
     curl_setopt($ch, CURLOPT_NOPROGRESS, false);
     $data = curl_exec($ch);
@@ -59,23 +62,34 @@ if (isset($_GET['download']) && $scan['screenshot_url']) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Screenshot - <?= APP_NAME ?></title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔗</text></svg>">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>tailwind.config={darkMode:'class',theme:{extend:{fontFamily:{sans:['Inter','sans-serif']}}}}</script>
+    <style>.btn-hover{transition:all .15s ease}.btn-hover:hover{transform:scale(1.02)}.btn-hover:active{transform:scale(.98)}.card-hover{transition:all .2s ease}.card-hover:hover{box-shadow:0 10px 25px -5px rgba(0,0,0,.1);transform:translateY(-2px)}</style>
 </head>
-<body class="bg-gray-100">
-    <nav class="bg-white shadow-md">
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+    <nav class="bg-white dark:bg-gray-800 shadow-md border-b border-gray-200 dark:border-gray-700">
         <div class="container mx-auto px-6 py-3">
             <div class="flex justify-between items-center">
-                <div class="text-xl font-semibold text-gray-700">🔍 <?= APP_NAME ?></div>
-                <div class="flex space-x-4">
-                    <a href="index.php" class="text-gray-600 hover:text-gray-800">Dashboard</a>
-                    <a href="history.php" class="text-gray-600 hover:text-gray-800">Riwayat</a>
-                    <?php if (isset($_SESSION['username']) && $_SESSION['username'] === 'admin'): ?>
-                        <a href="admin/dashboard.php" class="text-gray-600 hover:text-gray-800">Admin Panel</a>
+                <a href="index.php" class="text-xl font-semibold text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">🔍 <?= APP_NAME ?></a>
+                <div class="flex items-center space-x-4">
+                    <a href="index.php" class="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Dashboard</a>
+                    <a href="history.php" class="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Riwayat</a>
+                    <a href="guide.php" class="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Panduan</a>
+                    <?php if (isAdmin()): ?>
+                        <a href="admin/dashboard.php" class="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Admin Panel</a>
                     <?php endif; ?>
-                    <a href="profile.php" class="text-gray-600 hover:text-gray-800">Profil</a>
-                    <span class="text-gray-400">|</span>
-                    <span class="text-gray-600">Halo, <?= htmlspecialchars($_SESSION['username']) ?></span>
-                    <a href="logout.php" class="text-red-600 hover:text-red-800">Logout</a>
+                    <a href="profile.php" class="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Profil</a>
+                    <span class="text-gray-300 dark:text-gray-600">|</span>
+                    <span class="text-gray-600 dark:text-gray-300 text-sm"><?= htmlspecialchars($_SESSION['username']) ?></span>
+                    <button onclick="toggleDark()" class="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 text-lg transition-colors" title="Toggle Dark Mode">
+                        <span id="darkIcon">🌙</span>
+                    </button>
+                    <form method="POST" action="logout.php" class="inline">
+                        <input type="hidden" name="csrf_token" value="<?= generateCsrfToken() ?>">
+                        <button type="submit" class="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 cursor-pointer transition-colors font-medium">Logout</button>
+                    </form>
                 </div>
             </div>
         </div>
@@ -83,29 +97,24 @@ if (isset($_GET['download']) && $scan['screenshot_url']) {
 
     <div class="container mx-auto px-6 py-8 max-w-6xl">
         <!-- Header Info -->
-        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6 card-hover">
             <div class="flex justify-between items-start mb-4">
                 <div>
-                    <h1 class="text-2xl font-bold text-gray-800 mb-2">📸 Screenshot Website</h1>
-                    <p class="text-gray-600 font-mono break-all text-sm"><?= htmlspecialchars($scan['url']) ?></p>
+                    <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-2">📸 Screenshot Website</h1>
+                    <p class="text-gray-600 dark:text-gray-300 font-mono break-all text-sm"><?= htmlspecialchars($scan['url']) ?></p>
                 </div>
                 <div>
                     <div class="text-right">
                         <?php
                             $score = (int)$scan['safety_score'];
                             $malCount = (int)$scan['malicious_count'];
-                            if ($score > 90 && $malCount === 0) {
-                                $scoreColor = 'text-green-600';
-                            } elseif ($score >= 50 && $score <= 70) {
-                                $scoreColor = 'text-yellow-600';
-                            } elseif ($score < 40) {
-                                $scoreColor = 'text-red-600';
-                            } else {
-                                $scoreColor = $malCount > 0 ? 'text-yellow-600' : 'text-green-600';
-                            }
+                            $suspCount = (int)$scan['suspicious_count'];
+                            $viewStatus = getScanStatus($score, $malCount, $suspCount);
+                            $colorMap = ['safe' => 'text-green-600', 'suspicious' => 'text-yellow-600', 'malicious' => 'text-red-600'];
+                            $scoreColor = $colorMap[$viewStatus] ?? 'text-gray-600 dark:text-gray-300';
                         ?>
                         <div class="text-3xl font-bold <?= $scoreColor ?>"><?= $scan['safety_score'] ?>/100</div>
-                        <div class="text-sm text-gray-500">Skor Keamanan</div>
+                        <div class="text-sm text-gray-500 dark:text-gray-400">Skor Keamanan</div>
                     </div>
                 </div>
             </div>
@@ -113,23 +122,23 @@ if (isset($_GET['download']) && $scan['screenshot_url']) {
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                 <div class="bg-red-50 p-3 rounded">
                     <div class="text-xl font-bold text-red-600"><?= $scan['malicious_count'] ?></div>
-                    <div class="text-xs text-gray-600">Malicious</div>
+                    <div class="text-xs text-gray-600 dark:text-gray-300">Malicious</div>
                 </div>
                 <div class="bg-yellow-50 p-3 rounded">
                     <div class="text-xl font-bold text-yellow-600"><?= $scan['suspicious_count'] ?></div>
-                    <div class="text-xs text-gray-600">Suspicious</div>
+                    <div class="text-xs text-gray-600 dark:text-gray-300">Suspicious</div>
                 </div>
                 <div class="bg-green-50 p-3 rounded">
                     <div class="text-xl font-bold text-green-600"><?= $scan['harmless_count'] ?></div>
-                    <div class="text-xs text-gray-600">Harmless</div>
+                    <div class="text-xs text-gray-600 dark:text-gray-300">Harmless</div>
                 </div>
                 <div class="bg-gray-50 p-3 rounded">
-                    <div class="text-xl font-bold text-gray-600"><?= $scan['undetected_count'] ?></div>
-                    <div class="text-xs text-gray-600">Undetected</div>
+                    <div class="text-xl font-bold text-gray-600 dark:text-gray-300"><?= $scan['undetected_count'] ?></div>
+                    <div class="text-xs text-gray-600 dark:text-gray-300">Undetected</div>
                 </div>
             </div>
 
-            <div class="text-xs text-gray-500">
+            <div class="text-xs text-gray-500 dark:text-gray-400">
                 Scanned at: <?= date('d M Y H:i:s', strtotime($scan['scanned_at'])) ?> | 
                 Scan ID: #<?= $scan['id'] ?>
             </div>
@@ -137,8 +146,8 @@ if (isset($_GET['download']) && $scan['screenshot_url']) {
 
         <!-- Screenshot Display -->
         <?php if ($scan['screenshot_url']): ?>
-        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 class="text-xl font-bold text-gray-800 mb-4">🖼️ Preview</h2>
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6 card-hover">
+            <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">🖼️ Preview</h2>
             <div class="bg-gray-50 rounded-lg overflow-hidden flex items-center justify-center" style="min-height: 400px;">
                 <img src="<?= htmlspecialchars($scan['screenshot_url']) ?>" alt="Website Screenshot" 
                      class="max-w-full max-h-full" style="max-height: 600px;">
@@ -146,11 +155,11 @@ if (isset($_GET['download']) && $scan['screenshot_url']) {
             
             <div class="mt-4 flex gap-3">
                 <a href="view-screenshot.php?id=<?= $scan['id'] ?>&download=1" 
-                   class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition">
+                   class="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 py-2 rounded-lg btn-hover shadow-sm">
                     ⬇️ Download Screenshot
                 </a>
                 <a href="<?= htmlspecialchars($scan['screenshot_url']) ?>" target="_blank" 
-                   class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition">
+                   class="bg-gray-500 hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-500 text-white px-4 py-2 rounded-lg transition">
                     🔗 Buka di Tab Baru
                 </a>
             </div>
@@ -172,63 +181,66 @@ if (isset($_GET['download']) && $scan['screenshot_url']) {
 
         <!-- Scan Details -->
         <div class="bg-white rounded-lg shadow-md p-6">
-            <h2 class="text-xl font-bold text-gray-800 mb-4">📊 Detail Scan</h2>
+            <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">📊 Detail Scan</h2>
             
             <div class="grid md:grid-cols-2 gap-6">
                 <div>
-                    <h3 class="font-semibold text-gray-700 mb-3">Informasi Scan</h3>
+                    <h3 class="font-semibold text-gray-700 dark:text-gray-200 mb-3">Informasi Scan</h3>
                     <table class="w-full text-sm">
                         <tr class="border-b">
-                            <td class="py-2 text-gray-600">URL:</td>
+                            <td class="py-2 text-gray-600 dark:text-gray-300">URL:</td>
                             <td class="py-2 font-mono break-all"><?= htmlspecialchars($scan['url']) ?></td>
                         </tr>
                         <tr class="border-b">
-                            <td class="py-2 text-gray-600">Status:</td>
+                            <td class="py-2 text-gray-600 dark:text-gray-300">Status:</td>
                             <td class="py-2">
                                 <?php
-                                $statusBadge = match($scan['status']) {
-                                    'safe' => '<span class="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">🟢 AMAN</span>',
-                                    'suspicious' => '<span class="bg-yellow-100 text-yellow-700 px-2 py-1 rounded text-xs">🟡 MENCURIGAKAN</span>',
-                                    'malicious' => '<span class="bg-red-100 text-red-700 px-2 py-1 rounded text-xs">🔴 BERBAHAYA</span>',
-                                    default => '<span class="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs">UNKNOWN</span>'
-                                };
+                                if ($scan['status'] === 'safe') {
+                                    $statusBadge = '<span class="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">🟢 AMAN</span>';
+                                } elseif ($scan['status'] === 'suspicious') {
+                                    $statusBadge = '<span class="bg-yellow-100 text-yellow-700 px-2 py-1 rounded text-xs">🟡 MENCURIGAKAN</span>';
+                                } elseif ($scan['status'] === 'malicious') {
+                                    $statusBadge = '<span class="bg-red-100 text-red-700 px-2 py-1 rounded text-xs">🔴 BERBAHAYA</span>';
+                                } else {
+                                    $statusBadge = '<span class="bg-gray-100 text-gray-700 dark:text-gray-200 px-2 py-1 rounded text-xs">UNKNOWN</span>';
+                                }
                                 echo $statusBadge;
                                 ?>
                             </td>
                         </tr>
                         <tr class="border-b">
-                            <td class="py-2 text-gray-600">Total Engine:</td>
+                            <td class="py-2 text-gray-600 dark:text-gray-300">Total Engine:</td>
                             <td class="py-2"><?= $scan['total_engines'] ?> engine</td>
                         </tr>
                         <tr class="border-b">
-                            <td class="py-2 text-gray-600">Keamanan Score:</td>
+                            <td class="py-2 text-gray-600 dark:text-gray-300">Keamanan Score:</td>
                             <td class="py-2 font-bold text-lg"><?= $scan['safety_score'] ?>/100</td>
                         </tr>
                         <tr>
-                            <td class="py-2 text-gray-600">Waktu Scan:</td>
+                            <td class="py-2 text-gray-600 dark:text-gray-300">Waktu Scan:</td>
                             <td class="py-2"><?= date('d M Y H:i:s', strtotime($scan['scanned_at'])) ?></td>
                         </tr>
                     </table>
                 </div>
 
                 <div>
-                    <h3 class="font-semibold text-gray-700 mb-3">Hasil Engine</h3>
+                    <h3 class="font-semibold text-gray-700 dark:text-gray-200 mb-3">Hasil Engine</h3>
                     <div class="space-y-2">
                         <div class="flex justify-between items-center">
-                            <span class="text-gray-600">Malicious:</span>
+                            <span class="text-gray-600 dark:text-gray-300">Malicious:</span>
                             <span class="bg-red-100 text-red-700 px-3 py-1 rounded font-semibold"><?= $scan['malicious_count'] ?></span>
                         </div>
                         <div class="flex justify-between items-center">
-                            <span class="text-gray-600">Suspicious:</span>
+                            <span class="text-gray-600 dark:text-gray-300">Suspicious:</span>
                             <span class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded font-semibold"><?= $scan['suspicious_count'] ?></span>
                         </div>
                         <div class="flex justify-between items-center">
-                            <span class="text-gray-600">Harmless:</span>
+                            <span class="text-gray-600 dark:text-gray-300">Harmless:</span>
                             <span class="bg-green-100 text-green-700 px-3 py-1 rounded font-semibold"><?= $scan['harmless_count'] ?></span>
                         </div>
                         <div class="flex justify-between items-center">
-                            <span class="text-gray-600">Undetected:</span>
-                            <span class="bg-gray-100 text-gray-700 px-3 py-1 rounded font-semibold"><?= $scan['undetected_count'] ?></span>
+                            <span class="text-gray-600 dark:text-gray-300">Undetected:</span>
+                            <span class="bg-gray-100 text-gray-700 dark:text-gray-200 px-3 py-1 rounded font-semibold"><?= $scan['undetected_count'] ?></span>
                         </div>
                     </div>
                 </div>
@@ -237,8 +249,29 @@ if (isset($_GET['download']) && $scan['screenshot_url']) {
 
         <!-- Back Button -->
         <div class="mt-8">
-            <a href="history.php" class="text-blue-600 hover:text-blue-800">← Kembali ke Riwayat</a>
+            <a href="history.php" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">← Kembali ke Riwayat</a>
         </div>
     </div>
+    <footer class="bg-gray-100 dark:bg-gray-850 border-t border-gray-200 dark:border-gray-700 mt-12 py-6">
+        <div class="container mx-auto px-6 text-center">
+            <p class="text-gray-500 dark:text-gray-400 text-sm">🔍 <?= APP_NAME ?> v2.0 &copy; <?= date('Y') ?></p>
+
+        </div>
+    </footer>
+    <script>
+        if (localStorage.getItem('darkMode') === 'enabled') {
+            document.documentElement.classList.add('dark');
+            document.getElementById('darkIcon').textContent = '☀️';
+        }
+        function toggleDark() {
+            const html = document.documentElement;
+            html.classList.toggle('dark');
+            const isDark = html.classList.contains('dark');
+            localStorage.setItem('darkMode', isDark ? 'enabled' : 'disabled');
+            document.getElementById('darkIcon').textContent = isDark ? '☀️' : '🌙';
+        }
+    </script>
 </body>
 </html>
+
+

@@ -1,14 +1,24 @@
 <?php
 require_once 'includes/auth.php';
 
+$error = '';
+
 if (isLoggedIn()) {
     header('Location: index.php');
     exit;
 }
 
-$error = '';
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+// Rate limiting
+$maxAttempts = 5;
+$lockoutTime = 300;
+if (!isset($_SESSION['login_attempts'])) {
+    $_SESSION['login_attempts'] = 0;
+    $_SESSION['login_block_until'] = 0;
+}
+if ($_SESSION['login_block_until'] > time()) {
+    $remaining = ceil(($_SESSION['login_block_until'] - time()) / 60);
+    $error = "Terlalu banyak percobaan login. Coba lagi dalam $remaining menit.";
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($_POST['csrf_token']) || !verifyCsrfToken($_POST['csrf_token'])) {
         $error = 'Permintaan tidak sah. Muat ulang halaman dan coba lagi.';
     } else {
@@ -20,10 +30,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $result = loginUser($username, $password);
             if ($result['success']) {
+                $_SESSION['login_attempts'] = 0;
                 header('Location: index.php');
                 exit;
             } else {
-                $error = $result['message'];
+                $_SESSION['login_attempts']++;
+                if ($_SESSION['login_attempts'] >= $maxAttempts) {
+                    $lockoutMultiplier = 1 + floor(($_SESSION['login_block_count'] ?? 0) / 3);
+                    $currentLockout = $lockoutTime * $lockoutMultiplier;
+                    $_SESSION['login_block_until'] = time() + $currentLockout;
+                    $_SESSION['login_block_count'] = ($_SESSION['login_block_count'] ?? 0) + 1;
+                    $minutes = ceil($currentLockout / 60);
+                    $error = "Terlalu banyak percobaan login. Coba lagi $minutes menit.";
+                } else {
+                    $error = $result['message'];
+                }
             }
         }
     }
@@ -35,7 +56,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - <?= APP_NAME ?></title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔗</text></svg>">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>tailwind.config={theme:{extend:{fontFamily:{sans:['Inter','sans-serif']}}}}</script>
+    <style>.btn-hover{transition:all .15s ease}.btn-hover:hover{transform:scale(1.02)}.btn-hover:active{transform:scale(.98)}</style>
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
     <div class="container mx-auto px-4 py-12 max-w-md">
@@ -71,19 +96,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
                 
                 <button type="submit" 
-                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200">
-                    Login
+                        class="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-2.5 px-4 rounded-lg btn-hover shadow-md">
+                    🔑 Login
                 </button>
             </form>
             
             <p class="text-center text-gray-600 mt-6">
                 Belum punya akun? <a href="register.php" class="text-blue-600 hover:underline">Daftar di sini</a>
             </p>
+        </div>
+        
+        <p class="text-center text-gray-500 text-sm mt-6">
+            &copy; <?= date('Y') ?> <?= APP_NAME ?>. All rights reserved.
+        </p>
             
-            <div class="mt-4 pt-4 border-t text-center text-sm text-gray-500">
-                <p>Demo: admin / admin123</p>
-                <p>Demo: user / user123</p>
-            </div>
+
         </div>
     </div>
     <script>
