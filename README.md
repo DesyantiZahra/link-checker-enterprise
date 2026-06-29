@@ -142,29 +142,6 @@ http://localhost/link-checker/system-check.php
 
 ---
 
-## 🎯 Fitur Yang Akan Datang (Roadmap)
-
-### Phase 2
-
-- ⏳ Scheduled Scanning (scan otomatis berkala)
-- ⏳ Email Notifications
-- ⏳ Advanced Analytics Dashboard
-- ⏳ API Endpoints
-
-### Phase 3
-
-- ⏳ Team Collaboration
-- ⏳ Subscription Plans
-- ⏳ Payment Integration
-
-### Phase 4
-
-- ⏳ Browser Extension
-- ⏳ Mobile App
-- ⏳ White Label Solution
-
----
-
 ## 🔐 Keamanan
 
 - **Password**: Dienkripsi dengan bcrypt (PASSWORD_DEFAULT)
