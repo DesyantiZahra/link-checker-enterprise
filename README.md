@@ -274,48 +274,13 @@ https://httpbin.org      # Safe (API testing)
 - **Screenshot**: < 10 detik (URLScan.io, dengan polling loop 12 iterasi)
 - **Polling Strategy**: Kedua API (VT & URLScan) menggunakan polling loop bukan `sleep()` tetap
 
----
-
-## 🐛 Troubleshooting
-
-### Screenshot tidak muncul?
-
-1. Cek API key URLScan di `includes/config.php`
-2. Beberapa website ditolak oleh URLScan (Google, Facebook, dll)
-3. Jalankan `install-migration.php` untuk memastikan kolom database lengkap
-4. Cek error di browser console (F12)
-
-### Hasil scan lama statusnya salah?
-
-Tidak perlu khawatir — sistem otomatis menghitung ulang skor dan status setiap kali data ditampilkan (dashboard, riwayat, detail, export CSV, admin panel). Kolom database `status` dan `safety_score` tidak digunakan langsung oleh antarmuka.
-
-### Scan gagal?
-
-1. Pastikan API key VirusTotal aktif
-2. Cek koneksi internet
-3. Buka `system-check.php` untuk diagnostik otomatis (termasuk live test URLScan API key)
-
-### Database error?
-
-1. Pastikan MySQL running di XAMPP
-2. Cek kredensial di `includes/config.php`
-3. Jalankan `install-migration.php` untuk setup ulang schema
-
-### Lupa password admin?
-
-1. Hubungi administrator database untuk mereset password manual via SQL
-2. Atau jalankan ulang `install-migration.php` untuk reset user admin
-
----
-
-## 📞 Dukungan
-
-- **Email**: support@linkchecker.local
-- **Bug Report**: Hubungi administrator
-
----
+--
 
 ## 📄 License
+
+Nama : Desyanti Zahra 
+NIM : 101230077
+Kelas : TF23B
 
 Enterprise Link Checker - 2026
 
