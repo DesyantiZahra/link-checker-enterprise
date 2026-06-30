@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  php-lint:
+    name: PHP Syntax Check
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php-version: ['8.1', '8.2', '8.3']
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          tools: none
+
+      - name: Validate composer.json if exists
+        run: if [ -f composer.json ]; then composer validate; fi
+
+      - name: PHP syntax check (lint)
+        run: |
+          ERROR=0
+          while IFS= read -r -d '' file; do
+            if ! php -l "$file" 2>/dev/null; then
+              ERROR=1
+            fi
+          done < <(find . -name '*.php' -not -path './vendor/*' -not -path './includes/config.php' -print0)
+          exit $ERROR
+
+  security-check:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for hardcoded secrets in tracked files
+        run: |
+          echo "Checking for potential API key leaks in tracked files..."
+          grep -rnP '(VT_API_KEY|URLSCAN_API_KEY|password_hash)\s*[=:]\s*[''"][^''"]+[''"]' \
+            --include='*.php' --include='*.sql' --include='*.md' \
+            --exclude-dir=vendor \
+            --exclude='config.php' \
+            . || echo "✅ No hardcoded secrets found in tracked files"
