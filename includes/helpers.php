@@ -1,16 +1,26 @@
 <?php
 
+function calculateSafetyScore($malicious, $suspicious) {
+    if ($malicious > 0) {
+        return max(0, 65 - ($malicious - 1) * 20 - $suspicious * 5);
+    }
+    return max(0, 100 - $suspicious * 10);
+}
+
 function getScanStatus($score, $malicious, $suspicious) {
-    if ($score > 90 && $malicious === 0 && $suspicious === 0) {
-        return 'safe';
-    }
-    if ($score >= 50 && $score <= 70) {
-        return 'suspicious';
-    }
-    if ($score < 40) {
+    if ($malicious > 0) {
         return 'malicious';
     }
-    return ($malicious > 0 || $suspicious > 0) ? 'suspicious' : 'safe';
+    if ($suspicious > 0) {
+        return 'suspicious';
+    }
+    if ($score >= 70) {
+        return 'safe';
+    }
+    if ($score >= 40) {
+        return 'suspicious';
+    }
+    return 'malicious';
 }
 
 function getStatusBadgeClass($status) {

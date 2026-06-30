@@ -10,12 +10,25 @@ $pdo = getDB();
 $stmt = $pdo->query("
     SELECT 
         COUNT(DISTINCT u.id) as total_users,
-        COUNT(DISTINCT s.id) as total_scans,
-        SUM(CASE WHEN s.status = 'malicious' THEN 1 ELSE 0 END) as malicious_scans
+        COUNT(s.id) as total_scans,
+        COALESCE(SUM(CASE WHEN s.status = 'malicious' THEN 1 ELSE 0 END), 0) as malicious_scans
     FROM users u
     LEFT JOIN scan_history s ON u.id = s.user_id
 ");
 $stats = $stmt->fetch();
+
+// Semua user beserta jumlah scan-nya
+$userStmt = $pdo->query("
+    SELECT u.id, u.username, u.email, u.role, u.created_at,
+           COALESCE(COUNT(s.id), 0) as scan_count,
+           COALESCE(SUM(CASE WHEN s.status = 'malicious' THEN 1 ELSE 0 END), 0) as malicious_count,
+           COALESCE(SUM(CASE WHEN s.status = 'suspicious' THEN 1 ELSE 0 END), 0) as suspicious_count
+    FROM users u
+    LEFT JOIN scan_history s ON u.id = s.user_id
+    GROUP BY u.id
+    ORDER BY scan_count DESC, u.username ASC
+");
+$allUsers = $userStmt->fetchAll();
 
 // Pagination untuk tabel scan
 $page = max(1, (int)($_GET['page'] ?? 1));
@@ -94,9 +107,46 @@ $recentScans = $stmt->fetchAll();
             </div>
         </div>
 
+        <!-- Tabel Semua User -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow card-hover mb-8">
+            <div class="px-6 py-4 border-b dark:border-gray-700">
+                <h2 class="font-semibold text-gray-800 dark:text-gray-200">👥 Semua User</h2>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50 dark:bg-gray-700">
+                        <tr>
+                            <th class="px-4 py-3 text-left dark:text-gray-200">Username</th>
+                            <th class="px-4 py-3 text-left dark:text-gray-200">Email</th>
+                            <th class="px-4 py-3 text-center dark:text-gray-200">Role</th>
+                            <th class="px-4 py-3 text-center dark:text-gray-200">Total Scan</th>
+                            <th class="px-4 py-3 text-left dark:text-gray-200">Bergabung</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($allUsers as $u): ?>
+                            <tr class="border-t dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                                <td class="px-4 py-3 text-sm dark:text-gray-300"><?= htmlspecialchars($u['username']) ?></td>
+                                <td class="px-4 py-3 text-sm dark:text-gray-300"><?= htmlspecialchars($u['email']) ?></td>
+                                <td class="px-4 py-3 text-center text-sm">
+                                    <?php if ($u['role'] === 'admin'): ?>
+                                        <span class="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-xs font-medium">Admin</span>
+                                    <?php else: ?>
+                                        <span class="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs">User</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="px-4 py-3 text-center text-sm font-medium"><?= (int)$u['scan_count'] ?></td>
+                                <td class="px-4 py-3 text-sm dark:text-gray-300"><?= date('d/m/Y', strtotime($u['created_at'])) ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow card-hover">
             <div class="px-6 py-4 border-b dark:border-gray-700">
-                <h2 class="font-semibold text-gray-800 dark:text-gray-200">Scan Terbaru (Semua User)</h2>
+                <h2 class="font-semibold text-gray-800 dark:text-gray-200">📋 Scan Terbaru (Semua User)</h2>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full">
@@ -117,21 +167,21 @@ $recentScans = $stmt->fetchAll();
                                 <td class="px-4 py-3 text-sm truncate max-w-xs dark:text-gray-300"><?= htmlspecialchars($scan['url']) ?></td>
                                 <td class="px-4 py-3 text-center">
                                     <?php
-                                        $score = (int)$scan['safety_score'];
                                         $malCount = (int)$scan['malicious_count'];
                                         $suspCount = (int)$scan['suspicious_count'];
-                                        $adminStatus = getScanStatus($score, $malCount, $suspCount);
+                                        $recalcScore = calculateSafetyScore($malCount, $suspCount);
+                                        $adminStatus = getScanStatus($recalcScore, $malCount, $suspCount);
                                         $badgeMap = ['safe' => 'bg-green-500', 'suspicious' => 'bg-yellow-500', 'malicious' => 'bg-red-500'];
                                         $badgeClass = $badgeMap[$adminStatus] ?? 'bg-gray-500';
                                     ?>
                                     <span class="px-2 py-1 rounded text-sm <?= $badgeClass ?> text-white">
-                                        <?= $scan['safety_score'] ?>
+                                        <?= $recalcScore ?>
                                     </span>
                                 </td>
                                 <td class="px-4 py-3 text-center">
                                     <?php
                                     $badges = ['safe' => '🟢 Aman', 'suspicious' => '🟡 Mencurigakan', 'malicious' => '🔴 Berbahaya'];
-                                    echo $badges[$scan['status']] ?? '-';
+                                    echo $badges[$adminStatus] ?? '-';
                                     ?>
                                 </td>
                              </tr>

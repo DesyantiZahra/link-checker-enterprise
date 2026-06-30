@@ -44,17 +44,18 @@ $sql = "SELECT * FROM scan_history WHERE user_id = ?";
 $params = [$user['id']];
 
 if ($filter === 'safe') {
-    $sql .= " AND status = 'safe'";
+    $sql .= " AND malicious_count = 0 AND suspicious_count = 0";
 } elseif ($filter === 'suspicious') {
-    $sql .= " AND status = 'suspicious'";
+    $sql .= " AND malicious_count = 0 AND suspicious_count > 0";
 } elseif ($filter === 'malicious') {
-    $sql .= " AND status = 'malicious'";
+    $sql .= " AND malicious_count > 0";
 }
 
 if (!empty($search)) {
+    $escapedSearch = str_replace(['%', '_'], ['\\%', '\\_'], $search);
     $sql .= " AND (url LIKE ? OR final_url LIKE ?)";
-    $params[] = "%$search%";
-    $params[] = "%$search%";
+    $params[] = "%$escapedSearch%";
+    $params[] = "%$escapedSearch%";
 }
 
 $sql .= " ORDER BY scanned_at DESC LIMIT ? OFFSET ?";
@@ -72,16 +73,17 @@ $histories = $stmt->fetchAll();
 $totalSql = "SELECT COUNT(*) as total FROM scan_history WHERE user_id = ?";
 $totalParams = [$user['id']];
 if ($filter === 'safe') {
-    $totalSql .= " AND status = 'safe'";
+    $totalSql .= " AND malicious_count = 0 AND suspicious_count = 0";
 } elseif ($filter === 'suspicious') {
-    $totalSql .= " AND status = 'suspicious'";
+    $totalSql .= " AND malicious_count = 0 AND suspicious_count > 0";
 } elseif ($filter === 'malicious') {
-    $totalSql .= " AND status = 'malicious'";
+    $totalSql .= " AND malicious_count > 0";
 }
 if (!empty($search)) {
+    $escapedSearchTotal = str_replace(['%', '_'], ['\\%', '\\_'], $search);
     $totalSql .= " AND (url LIKE ? OR final_url LIKE ?)";
-    $totalParams[] = "%$search%";
-    $totalParams[] = "%$search%";
+    $totalParams[] = "%$escapedSearchTotal%";
+    $totalParams[] = "%$escapedSearchTotal%";
 }
 $totalStmt = $pdo->prepare($totalSql);
 $totalStmt->execute($totalParams);
@@ -89,13 +91,24 @@ $totalCount = $totalStmt->fetch()['total'];
 $totalPages = max(1, ceil($totalCount / $perPage));
 
 // Hitung jumlah per status untuk ditampilkan di tombol filter
-$cntStmt = $pdo->prepare("SELECT status, COUNT(*) as cnt FROM scan_history WHERE user_id = ? GROUP BY status");
+$cntStmt = $pdo->prepare("
+    SELECT
+        CASE
+            WHEN malicious_count > 0 THEN 'malicious'
+            WHEN suspicious_count > 0 THEN 'suspicious'
+            ELSE 'safe'
+        END as computed_status,
+        COUNT(*) as cnt
+    FROM scan_history
+    WHERE user_id = ?
+    GROUP BY computed_status
+");
 $cntStmt->execute([$user['id']]);
 $cntAll = $safeCnt = $suspCnt = $malCnt = 0;
 foreach ($cntStmt->fetchAll() as $row) {
-    if ($row['status'] === 'safe')       $safeCnt  = (int)$row['cnt'];
-    elseif ($row['status'] === 'suspicious') $suspCnt = (int)$row['cnt'];
-    elseif ($row['status'] === 'malicious')  $malCnt  = (int)$row['cnt'];
+    if ($row['computed_status'] === 'safe')       $safeCnt  = (int)$row['cnt'];
+    elseif ($row['computed_status'] === 'suspicious') $suspCnt = (int)$row['cnt'];
+    elseif ($row['computed_status'] === 'malicious')  $malCnt  = (int)$row['cnt'];
     $cntAll += (int)$row['cnt'];
 }
 
@@ -296,15 +309,15 @@ if (isset($_GET['deleted'])) {
                                     <td class="px-4 py-3 text-sm truncate max-w-xs dark:text-gray-300"><?= htmlspecialchars($h['url']) ?></td>
                                     <td class="px-4 py-3 text-center">
                                         <?php
-                                            $score = (int)$h['safety_score'];
                                             $malCount = (int)$h['malicious_count'];
                                             $suspCount = (int)$h['suspicious_count'];
-                                            $status = getScanStatus($score, $malCount, $suspCount);
+                                            $recalcScore = calculateSafetyScore($malCount, $suspCount);
+                                            $status = getScanStatus($recalcScore, $malCount, $suspCount);
                                             $scoreClass = getStatusBadgeClass($status);
                                             $statusText = getStatusLabel($status);
                                         ?>
                                         <span class="px-2 py-1 rounded text-xs <?= $scoreClass ?>">
-                                            <?= $h['safety_score'] ?>
+                                            <?= $recalcScore ?>
                                         </span>
                                     </td>
                                     <td class="px-4 py-3 text-center text-sm"><?= $statusText ?></td>

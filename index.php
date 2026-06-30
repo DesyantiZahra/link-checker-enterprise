@@ -1,52 +1,53 @@
 <?php
 require_once 'includes/auth.php';
 require_once 'includes/db.php';
+require_once 'includes/helpers.php';
 $user = requireAuth();
 
-// Ambil statistik
 $pdo = getDB();
-$stmt = $pdo->prepare("SELECT COUNT(*) as total, SUM(CASE WHEN status='safe' THEN 1 ELSE 0 END) as safe, SUM(CASE WHEN status='suspicious' THEN 1 ELSE 0 END) as suspicious, SUM(CASE WHEN status='malicious' THEN 1 ELSE 0 END) as malicious FROM scan_history WHERE user_id = ?");
+
+// Ambil semua data mentah (malicious_count, suspicious_count) untuk dihitung ulang
+$stmt = $pdo->prepare("SELECT malicious_count, suspicious_count, DATE(scanned_at) as tgl FROM scan_history WHERE user_id = ? ORDER BY scanned_at ASC");
 $stmt->execute([$user['id']]);
-$stats = $stmt->fetch();
+$allScans = $stmt->fetchAll();
+
+// Hitung statistik total dengan rumus baru
+$stats = ['total' => 0, 'safe' => 0, 'suspicious' => 0, 'malicious' => 0];
+foreach ($allScans as $row) {
+    $stats['total']++;
+    $mal = (int)$row['malicious_count'];
+    $susp = (int)$row['suspicious_count'];
+    $score = calculateSafetyScore($mal, $susp);
+    $status = getScanStatus($score, $mal, $susp);
+    $stats[$status]++;
+}
 
 // Statistik 7 hari terakhir untuk grafik tren
-$stmt = $pdo->prepare("
-    SELECT DATE(scanned_at) as tgl,
-           SUM(CASE WHEN status='safe'        THEN 1 ELSE 0 END) as safe,
-           SUM(CASE WHEN status='suspicious'  THEN 1 ELSE 0 END) as suspicious,
-           SUM(CASE WHEN status='malicious'   THEN 1 ELSE 0 END) as malicious
-    FROM scan_history
-    WHERE user_id = ? AND scanned_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
-    GROUP BY DATE(scanned_at) ORDER BY tgl ASC
-");
-$stmt->execute([$user['id']]);
-$trendRaw = $stmt->fetchAll();
-
-// Susun array 7 hari (isi 0 untuk hari tanpa data)
 $trendLabels = [];
 $trendSafe = $trendSuspicious = $trendMalicious = [];
 for ($i = 6; $i >= 0; $i--) {
     $d = date('Y-m-d', strtotime("-$i days"));
     $trendLabels[] = date('d M', strtotime($d));
-    $found = false;
-    foreach ($trendRaw as $row) {
+    $safe = $susp = $mal = 0;
+    foreach ($allScans as $row) {
         if ($row['tgl'] === $d) {
-            $trendSafe[]       = (int)$row['safe'];
-            $trendSuspicious[] = (int)$row['suspicious'];
-            $trendMalicious[]  = (int)$row['malicious'];
-            $found = true;
-            break;
+            $malCount = (int)$row['malicious_count'];
+            $suspCount = (int)$row['suspicious_count'];
+            $score = calculateSafetyScore($malCount, $suspCount);
+            $status = getScanStatus($score, $malCount, $suspCount);
+            if ($status === 'malicious') $mal++;
+            elseif ($status === 'suspicious') $susp++;
+            else $safe++;
         }
     }
-    if (!$found) {
-        $trendSafe[] = 0; $trendSuspicious[] = 0; $trendMalicious[] = 0;
-    }
+    $trendSafe[] = $safe;
+    $trendSuspicious[] = $susp;
+    $trendMalicious[] = $mal;
 }
 
-// Distribusi status untuk pie chart
-$safeCount       = (int)($stats['safe']       ?? 0);
-$suspiciousCount = (int)($stats['suspicious'] ?? 0);
-$maliciousCount  = (int)($stats['malicious']  ?? 0);
+$safeCount       = $stats['safe'];
+$suspiciousCount = $stats['suspicious'];
+$maliciousCount  = $stats['malicious'];
 ?>
 <!DOCTYPE html>
 <html lang="id">

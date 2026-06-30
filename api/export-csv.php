@@ -1,6 +1,7 @@
 <?php
 require_once '../includes/auth.php';
 require_once '../includes/db.php';
+require_once '../includes/helpers.php';
 
 $user = requireAuth();
 $pdo = getDB();
@@ -53,14 +54,18 @@ fputcsv($output, [
 
 // Add data rows
 foreach ($scans as $scan) {
+    $mal = (int)$scan['malicious_count'];
+    $susp = (int)$scan['suspicious_count'];
+    $recalcScore = calculateSafetyScore($mal, $susp);
+    $recalcStatus = getScanStatus($recalcScore, $mal, $susp);
     fputcsv($output, [
         $scan['id'],
         date('d/m/Y H:i:s', strtotime($scan['scanned_at'])),
         $scan['url'],
-        $scan['safety_score'],
-        ucfirst($scan['status']),
-        $scan['malicious_count'],
-        $scan['suspicious_count'],
+        $recalcScore,
+        ucfirst($recalcStatus),
+        $mal,
+        $susp,
         $scan['harmless_count'],
         $scan['undetected_count'],
         $scan['total_engines'],

@@ -5,13 +5,17 @@
 Aplikasi **Link Checker** adalah platform untuk memeriksa keamanan URL dengan menggunakan lebih dari 70 engine antivirus secara bersamaan. Setiap scan dilengkapi dengan:
 
 - ✅ Hasil dari 70+ engine antivirus (VirusTotal)
-- ✅ Screenshot website (URLScan.io)
-- ✅ Skor keamanan (0-100)
+- ✅ Screenshot website (URLScan.io) + download PNG
+- ✅ Skor keamanan piecewise (0-100) berdasarkan jumlah malicious/suspicious
+- ✅ Prioritas status: malicious > suspicious > safe (keamanan diutamakan)
+- ✅ Caching otomatis — URL yang pernah di-scan langsung tampil, riwayat baru tetap tercatat
+- ✅ Semua nilai skor & status dihitung ulang dengan rumus terbaru saat ditampilkan
 - ✅ Penyimpanan riwayat seumur hidup
-- ✅ Export ke CSV
+- ✅ Export ke CSV (dengan recalculate otomatis)
 - ✅ Export laporan scan ke PDF
 - ✅ Grafik tren statistik 7 hari (Chart.js)
-- ✅ Filter & pencarian riwayat
+- ✅ Filter & pencarian riwayat (berdasarkan malicious/suspicious count, bukan kolom legacy)
+- ✅ Proteksi CSRF di semua form + rate limiting login
 - ✅ Panel Admin untuk melihat statistik semua user
 
 ---
@@ -129,16 +133,20 @@ http://localhost/link-checker/system-check.php
 | Fitur                | Status | Keterangan |
 |----------------------|--------|------------|
 | Scan Multi-Engine    | ✅     | 70+ antivirus engine via VirusTotal v3 |
-| Screenshot Website   | ✅     | URLScan.io integration dengan polling loop |
-| Skor Keamanan        | ✅     | 0-100 scale |
-| Riwayat Scan         | ✅     | Unlimited storage, filter, search |
-| Export CSV           | ✅     | Download history dengan UTF-8 BOM |
+| Caching Scan         | ✅     | URL berulang langsung dari cache, riwayat baru tetap tersimpan |
+| Skor Keamanan        | ✅     | Piecewise: mal>0 → max(0, 65-(mal-1)×20-susp×5), else → max(0, 100-susp×10) |
+| Prioritas Status     | ✅     | malicious > suspicious > safe (meski skor masih tinggi) |
+| Recalculate Otomatis | ✅     | Semua tampilan & export hitung ulang skor/status dengan helper |
+| Screenshot Website   | ✅     | URLScan.io integration dengan polling 12 iterasi + download PNG |
+| Riwayat Scan         | ✅     | Unlimited storage, filter (via count), search |
+| Export CSV           | ✅     | Download history dengan recalculate otomatis |
 | Export PDF           | ✅     | Download laporan scan per-ID |
-| Grafik Statistik     | ✅     | Tren 7 hari & distribusi status (Chart.js) |
-| User Authentication  | ✅     | Bcrypt + CSRF token |
+| Grafik Statistik     | ✅     | Tren 7 hari & distribusi status (Chart.js) — recalculate di PHP |
+| User Authentication  | ✅     | Bcrypt + CSRF token + rate limiting login |
 | Multi-user           | ✅     | Separate workspaces per user |
-| Admin Panel          | ✅     | Statistik semua user & scan global |
+| Admin Panel          | ✅     | Statistik semua user (termasuk yg 0 scan) + recalculate otomatis |
 | Engine Detail        | ✅     | Hasil deteksi per engine antivirus |
+| System Check         | ✅     | Diagnostik otomatis termasuk live test URLScan API key |
 
 ---
 
@@ -170,6 +178,9 @@ harmless_count, undetected_count, total_engines, safety_score,
 status ENUM('safe','suspicious','malicious','error'),
 vt_scan_id, screenshot_url, engine_results (LONGTEXT JSON), response_time_ms, scanned_at
 ```
+
+> **Catatan:** Kolom `safety_score` dan `status` di database menyimpan nilai legacy (rumus lama).
+> Sistem selalu menghitung ulang skor & status dengan `calculateSafetyScore()` dan `getScanStatus()` saat ditampilkan di halaman mana pun (dashboard, riwayat, detail, export CSV, admin panel).
 
 ---
 
@@ -205,7 +216,9 @@ link-checker/
 │   ├── config.example.php # Template konfigurasi (tanpa API key)
 │   ├── db.php             # Koneksi PDO database
 │   ├── auth.php           # Auth: login, register, CSRF, requireAuth, requireAdmin
-│   └── helpers.php        # Fungsi bantu: getScanStatus, badge, label
+│   └── helpers.php        # Fungsi bantu: calculateSafetyScore (piecewise),
+│                          #   getScanStatus (prioritas mal>susp>score),
+│                          #   getStatusBadgeClass, getStatusLabel
 ```
 
 ---
@@ -254,10 +267,11 @@ https://httpbin.org      # Safe (API testing)
 
 ## ⚡ Performance
 
-- **Scan Time**: 10-15 detik (termasuk screenshot)
+- **Scan Time (URL baru)**: 10-15 detik (termasuk screenshot)
+- **Scan Time (cache)**: < 1 detik — hasil langsung dari cache, riwayat baru tetap tercatat
 - **Database Query**: < 100ms
 - **API Response**: < 5 detik (VirusTotal)
-- **Screenshot**: < 8 detik (URLScan.io, dengan polling loop 8 iterasi)
+- **Screenshot**: < 10 detik (URLScan.io, dengan polling loop 12 iterasi)
 - **Polling Strategy**: Kedua API (VT & URLScan) menggunakan polling loop bukan `sleep()` tetap
 
 ---
@@ -271,11 +285,15 @@ https://httpbin.org      # Safe (API testing)
 3. Jalankan `install-migration.php` untuk memastikan kolom database lengkap
 4. Cek error di browser console (F12)
 
+### Hasil scan lama statusnya salah?
+
+Tidak perlu khawatir — sistem otomatis menghitung ulang skor dan status setiap kali data ditampilkan (dashboard, riwayat, detail, export CSV, admin panel). Kolom database `status` dan `safety_score` tidak digunakan langsung oleh antarmuka.
+
 ### Scan gagal?
 
 1. Pastikan API key VirusTotal aktif
 2. Cek koneksi internet
-3. Buka `system-check.php` untuk diagnostik otomatis
+3. Buka `system-check.php` untuk diagnostik otomatis (termasuk live test URLScan API key)
 
 ### Database error?
 
@@ -303,6 +321,6 @@ Enterprise Link Checker - 2026
 
 ---
 
-**Last Updated**: 22 Mei 2026
-**Version**: 1.0 Beta
+**Last Updated**: 30 Juni 2026
+**Version**: 2.0
 **Status**: Production Ready

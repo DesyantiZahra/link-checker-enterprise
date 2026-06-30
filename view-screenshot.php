@@ -32,9 +32,6 @@ if (isset($_GET['download']) && $scan['screenshot_url']) {
     $host = preg_replace('/[^a-zA-Z0-9.-]/', '_', $host);
     $filename = "screenshot_{$host}_{$timestamp}.png";
     
-    header('Content-Type: application/octet-stream');
-    header('Content-Disposition: attachment; filename="' . $filename . '"');
-    
     set_time_limit(60);
     $maxBytes = 10485760; // 10 MB max
 
@@ -44,15 +41,48 @@ if (isset($_GET['download']) && $scan['screenshot_url']) {
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-    curl_setopt($ch, CURLOPT_NOPROGRESS, false);
-    $data = curl_exec($ch);
+    curl_setopt($ch, CURLOPT_HEADER, true);
+    $response = curl_exec($ch);
+    $curlInfo = curl_getinfo($ch);
     curl_close($ch);
 
-    if ($data === false || strlen($data) > $maxBytes) {
-        echo "Failed to retrieve screenshot or file too large.";
+    $headerSize = $curlInfo['header_size'];
+    $body = substr($response, $headerSize);
+    $contentType = $curlInfo['content_type'] ?? '';
+
+    if ($body === false || strlen($body) > $maxBytes) {
+        echo "Gagal mengambil screenshot atau file terlalu besar.";
         exit;
     }
-    echo $data;
+
+    // Validasi Content-Type
+    $allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif'];
+    $isValidImage = false;
+    foreach ($allowedTypes as $type) {
+        if (stripos($contentType, $type) !== false) {
+            $isValidImage = true;
+            break;
+        }
+    }
+    if (!$isValidImage) {
+        error_log("Screenshot download: invalid content type '$contentType' for URL: $imageUrl");
+        echo "Gagal mengunduh screenshot: tipe konten tidak valid.";
+        exit;
+    }
+
+    $ext = 'png';
+    if (stripos($contentType, 'jpeg') !== false || stripos($contentType, 'jpg') !== false) {
+        $ext = 'jpg';
+    } elseif (stripos($contentType, 'webp') !== false) {
+        $ext = 'webp';
+    } elseif (stripos($contentType, 'gif') !== false) {
+        $ext = 'gif';
+    }
+
+    header('Content-Type: ' . $contentType);
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Content-Length: ' . strlen($body));
+    echo $body;
     exit;
 }
 ?>
@@ -96,24 +126,31 @@ if (isset($_GET['download']) && $scan['screenshot_url']) {
     </nav>
 
     <div class="container mx-auto px-6 py-8 max-w-6xl">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-100">📸 Screenshot Website</h1>
+            <a href="history.php" class="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                Kembali ke Riwayat
+            </a>
+        </div>
+
         <!-- Header Info -->
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6 card-hover">
             <div class="flex justify-between items-start mb-4">
                 <div>
-                    <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-2">📸 Screenshot Website</h1>
                     <p class="text-gray-600 dark:text-gray-300 font-mono break-all text-sm"><?= htmlspecialchars($scan['url']) ?></p>
                 </div>
                 <div>
                     <div class="text-right">
                         <?php
-                            $score = (int)$scan['safety_score'];
                             $malCount = (int)$scan['malicious_count'];
                             $suspCount = (int)$scan['suspicious_count'];
+                            $score = calculateSafetyScore($malCount, $suspCount);
                             $viewStatus = getScanStatus($score, $malCount, $suspCount);
                             $colorMap = ['safe' => 'text-green-600', 'suspicious' => 'text-yellow-600', 'malicious' => 'text-red-600'];
                             $scoreColor = $colorMap[$viewStatus] ?? 'text-gray-600 dark:text-gray-300';
                         ?>
-                        <div class="text-3xl font-bold <?= $scoreColor ?>"><?= $scan['safety_score'] ?>/100</div>
+                        <div class="text-3xl font-bold <?= $scoreColor ?>"><?= $score ?>/100</div>
                         <div class="text-sm text-gray-500 dark:text-gray-400">Skor Keamanan</div>
                     </div>
                 </div>
@@ -247,10 +284,6 @@ if (isset($_GET['download']) && $scan['screenshot_url']) {
             </div>
         </div>
 
-        <!-- Back Button -->
-        <div class="mt-8">
-            <a href="history.php" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">← Kembali ke Riwayat</a>
-        </div>
     </div>
     <footer class="bg-gray-100 dark:bg-gray-850 border-t border-gray-200 dark:border-gray-700 mt-12 py-6">
         <div class="container mx-auto px-6 text-center">

@@ -51,7 +51,6 @@ requireAuth();
                 <ul class="space-y-2">
                     <li><a href="index.php" class="text-blue-600 hover:underline">→ Scan URL Baru</a></li>
                     <li><a href="history.php" class="text-blue-600 hover:underline">→ Lihat Riwayat Scan</a></li>
-                    <li><a href="features.php" class="text-blue-600 hover:underline">→ Lihat Fitur Enterprise</a></li>
                     <li><a href="profile.php" class="text-blue-600 hover:underline">→ Pengaturan Profil</a></li>
                 </ul>
             </div>
@@ -59,10 +58,13 @@ requireAuth();
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 card-hover">
                 <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">✨ Fitur Sekarang</h2>
                 <ul class="space-y-2 text-sm">
-                    <li>✅ Scan URL dengan 70+ engine antivirus</li>
-                    <li>✅ Lihat screenshot website</li>
-                    <li>✅ Export riwayat ke CSV</li>
-                    <li>✅ Filter dan cari riwayat</li>
+                    <li>✅ Scan URL dengan 70+ engine antivirus + caching otomatis</li>
+                    <li>✅ Skor keamanan piecewise (berdasarkan jumlah malicious/suspicious)</li>
+                    <li>✅ Prioritas status: malicious > suspicious > safe</li>
+                    <li>✅ Lihat screenshot website + download PNG</li>
+                    <li>✅ Export riwayat ke CSV (dihitung ulang dengan rumus terbaru)</li>
+                    <li>✅ Filter, cari, dan grafik statistik 7 hari</li>
+                    <li>✅ Proteksi CSRF di semua form + rate limiting login</li>
                 </ul>
             </div>
         </div>
@@ -79,9 +81,9 @@ requireAuth();
                         <ol class="list-decimal list-inside text-gray-700 dark:text-gray-200 space-y-1">
                             <li>Masukkan URL website yang ingin dicek</li>
                             <li>Klik tombol "Cek Keamanan"</li>
-                            <li>Tunggu hasil scan (10-15 detik)</li>
+                            <li>Tunggu hasil scan (10-15 detik untuk URL baru)</li>
                         </ol>
-                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-3">💡 Sistem akan scan URL ke 70+ engine antivirus dan mengambil screenshot website secara otomatis</p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-3">💡 URL yang pernah di-scan sebelumnya akan langsung ditampilkan dari <strong>cache</strong> — skor tetap dihitung ulang dengan rumus terbaru, dan riwayat scan baru tetap tercatat</p>
                     </div>
                 </div>
             </div>
@@ -94,11 +96,17 @@ requireAuth();
                     <div>
                         <p class="text-gray-600 dark:text-gray-300 mb-3">Hasil scan akan menampilkan:</p>
                         <ul class="space-y-2 text-gray-700 dark:text-gray-200">
-                            <li><strong>🎯 Skor Keamanan</strong> - Nilai 0-100 (semakin tinggi semakin aman)</li>
-                            <li><strong>📊 Hasil Engine</strong> - Berapa engine mendeteksi malicious/suspicious</li>
-                            <li><strong>📸 Screenshot</strong> - Preview visual dari website</li>
-                            <li><strong>🔍 Detail Engine</strong> - Klik untuk melihat hasil dari setiap engine</li>
+                            <li><strong>🎯 Skor Keamanan</strong> - Nilai 0-100 dengan rumus piecewise:
+                                <ul class="ml-5 mt-1 space-y-1 text-sm text-gray-600 dark:text-gray-400">
+                                    <li>Jika ada engine <strong>malicious</strong>: skor = max(0, 65 - (mal-1)×20 - susp×5)</li>
+                                    <li>Jika <strong>tidak ada</strong> malicious: skor = max(0, 100 - susp×10)</li>
+                                </ul>
+                            </li>
+                            <li><strong>📊 Hasil Engine</strong> - Berapa engine mendeteksi malicious/suspicious/harmless</li>
+                            <li><strong>📸 Screenshot</strong> - Preview visual dari website, bisa di-download PNG</li>
+                            <li><strong>🔍 Detail Engine</strong> - Klik untuk melihat hasil dari setiap engine antivirus</li>
                         </ul>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-3">💡 <strong>Prioritas status:</strong> Jika ada 1+ engine malicious → status "Berbahaya", meskipun skor masih tinggi. Keamanan adalah prioritas utama.</p>
                     </div>
                 </div>
             </div>
@@ -151,7 +159,13 @@ requireAuth();
 
                 <details class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 card-hover">
                     <summary class="cursor-pointer font-bold text-gray-800 dark:text-gray-100">Apa itu skor keamanan?</summary>
-                    <p class="text-gray-600 dark:text-gray-300 mt-2">Skor keamanan adalah nilai 0-100 berdasarkan hasil scan dari 70+ engine antivirus. Semakin tinggi semakin aman. Skor < 40 harus dihindari.</p>
+                    <p class="text-gray-600 dark:text-gray-300 mt-2">Skor keamanan adalah nilai 0-100 yang dihitung dengan rumus <strong>piecewise</strong> berdasarkan jumlah engine yang mendeteksi URL sebagai malicious/suspicious:</p>
+                    <ul class="list-disc list-inside text-gray-600 dark:text-gray-300 mt-2 space-y-1">
+                        <li><strong>Ada malicious:</strong> skor = max(0, 65 - (mal-1)×20 - susp×5)<br>
+                            Contoh: 1 mal → 65, 2 mal → 45, 3 mal → 25</li>
+                        <li><strong>Tidak ada malicious:</strong> skor = max(0, 100 - susp×10)<br>
+                            Contoh: 0 susp → 100, 5 susp → 50, 10 susp → 0</li>
+                    </ul>
                 </details>
 
                 <details class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 card-hover">
@@ -160,8 +174,13 @@ requireAuth();
                 </details>
 
                 <details class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 card-hover">
+                    <summary class="cursor-pointer font-bold text-gray-800 dark:text-gray-100">Apa itu sistem cache?</summary>
+                    <p class="text-gray-600 dark:text-gray-300 mt-2">Saat Anda scan URL yang sudah pernah diperiksa, sistem menggunakan data dari scan sebelumnya (cache) agar hasil langsung muncul tanpa menunggu proses ulang ke VirusTotal. Meskipun data dari cache, <strong>riwayat scan baru tetap dicatat</strong> dan skor dihitung ulang dengan rumus terbaru.</p>
+                </details>
+
+                <details class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 card-hover">
                     <summary class="cursor-pointer font-bold text-gray-800 dark:text-gray-100">Bagaimana privasi data saya?</summary>
-                    <p class="text-gray-600 dark:text-gray-300 mt-2">Semua data scan disimpan di database server kami dan hanya dapat diakses oleh akun Anda. Password dienkripsi dengan bcrypt (standar keamanan modern).</p>
+                    <p class="text-gray-600 dark:text-gray-300 mt-2">Semua data scan disimpan di database server kami dan hanya dapat diakses oleh akun Anda. Password dienkripsi dengan bcrypt. Setiap form dilindungi CSRF token dan login memiliki rate limiting untuk mencegah brute force.</p>
                 </details>
             </div>
         </div>
@@ -171,10 +190,10 @@ requireAuth();
             <h2 class="text-2xl font-bold text-blue-900 mb-4">💡 Tips & Trik</h2>
             <ul class="space-y-2 text-blue-800">
                 <li>✅ Selalu verifikasi URL sebelum membukanya di browser</li>
-                <li>✅ Gunakan fitur export untuk membuat laporan berkala</li>
+                <li>✅ Gunakan fitur export untuk membuat laporan berkala (skor & status otomatis diperbarui)</li>
                 <li>✅ Filter riwayat berdasarkan status untuk fokus pada URL berbahaya</li>
                 <li>✅ Lihat screenshot untuk mencegah phishing (perhatikan visual website)</li>
-                <li>✅ Bookmark halaman fitur untuk mengikuti perkembangan aplikasi</li>
+                <li>✅ Scan ulang URL yang sama untuk memanfaatkan cache — hasil instan tanpa menunggu</li>
             </ul>
         </div>
 

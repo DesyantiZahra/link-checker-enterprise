@@ -6,11 +6,12 @@ $user = requireAuth();
 $pdo = getDB();
 $userData = getCurrentUser();
 
-$message = '';
+$errorMessage = '';
+$successMessage = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($_POST['csrf_token']) || !verifyCsrfToken($_POST['csrf_token'])) {
-        $message = 'Permintaan tidak sah. Muat ulang halaman dan coba lagi.';
+        $errorMessage = 'Permintaan tidak sah. Muat ulang halaman dan coba lagi.';
     } elseif (isset($_POST['change_password'])) {
         $current = $_POST['current_password'] ?? '';
         $new = $_POST['new_password'] ?? '';
@@ -22,18 +23,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stored = $stmt->fetch();
         
         if (!$stored || !isset($stored['password_hash'])) {
-            $message = 'Data pengguna tidak ditemukan';
+            $errorMessage = 'Data pengguna tidak ditemukan';
         } elseif (!password_verify($current, $stored['password_hash'])) {
-            $message = 'Password saat ini salah';
+            $errorMessage = 'Password saat ini salah';
         } elseif (strlen($new) < 6) {
-            $message = 'Password baru minimal 6 karakter';
+            $errorMessage = 'Password baru minimal 6 karakter';
         } elseif ($new !== $confirm) {
-            $message = 'Konfirmasi password tidak cocok';
+            $errorMessage = 'Konfirmasi password tidak cocok';
         } else {
             $newHash = password_hash($new, PASSWORD_DEFAULT);
             $stmt = $pdo->prepare("UPDATE users SET password_hash = ? WHERE id = ?");
             $stmt->execute([$newHash, $user['id']]);
-            $message = 'Password berhasil diubah';
+            $successMessage = 'Password berhasil diubah';
         }
     }
 }
@@ -104,9 +105,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 card-hover">
             <h2 class="font-semibold text-gray-800 dark:text-gray-200 mb-4">Ganti Password</h2>
             
-            <?php if ($message): ?>
-                <div class="mb-4 p-3 rounded <?= strpos($message, 'berhasil') !== false ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700' ?>">
-                    <?= $message ?>
+            <?php if ($errorMessage): ?>
+                <div class="mb-4 p-3 rounded bg-red-100 text-red-700">
+                    <?= htmlspecialchars($errorMessage) ?>
+                </div>
+            <?php endif; ?>
+            <?php if ($successMessage): ?>
+                <div class="mb-4 p-3 rounded bg-green-100 text-green-700">
+                    <?= htmlspecialchars($successMessage) ?>
                 </div>
             <?php endif; ?>
             

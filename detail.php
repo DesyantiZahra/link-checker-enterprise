@@ -68,37 +68,63 @@ if (!empty($scan['engine_results'])) {
     <div class="container mx-auto px-6 py-8 max-w-4xl">
         <div class="flex justify-between items-center mb-6">
             <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-100">📋 Detail Scan</h1>
-            <a href="history.php" class="text-blue-600 dark:text-blue-400 hover:underline">← Kembali ke Riwayat</a>
+            <a href="history.php" class="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                Kembali ke Riwayat
+            </a>
         </div>
 
         <?php
-        $score = (int)$scan['safety_score'];
         $maliciousCount = (int)$scan['malicious_count'];
         $suspiciousCount = (int)$scan['suspicious_count'];
+        $score = calculateSafetyScore($maliciousCount, $suspiciousCount);
         
         $displayStatus = getScanStatus($score, $maliciousCount, $suspiciousCount);
 
         $statusMap = [
-            'safe' => ['color' => 'green', 'text' => 'AMAN', 'icon' => '🟢'],
-            'suspicious' => ['color' => 'yellow', 'text' => 'MENCURIGAKAN', 'icon' => '🟡'],
-            'malicious' => ['color' => 'red', 'text' => 'BERBAHAYA', 'icon' => '🔴'],
+            'safe' => [
+                'color' => 'green', 'text' => 'AMAN', 'icon' => '🟢',
+                'bgClass' => 'bg-green-100 dark:bg-green-900/30',
+                'textClass' => 'text-green-700',
+                'scoreClass' => 'text-green-600',
+                'recBgClass' => 'bg-green-100',
+            ],
+            'suspicious' => [
+                'color' => 'yellow', 'text' => 'MENCURIGAKAN', 'icon' => '🟡',
+                'bgClass' => 'bg-yellow-100 dark:bg-yellow-900/30',
+                'textClass' => 'text-yellow-700',
+                'scoreClass' => 'text-yellow-600',
+                'recBgClass' => 'bg-yellow-100',
+            ],
+            'malicious' => [
+                'color' => 'red', 'text' => 'BERBAHAYA', 'icon' => '🔴',
+                'bgClass' => 'bg-red-100 dark:bg-red-900/30',
+                'textClass' => 'text-red-700',
+                'scoreClass' => 'text-red-600',
+                'recBgClass' => 'bg-red-100',
+            ],
         ];
-        $statusInfo = $statusMap[$displayStatus] ?? ['color' => 'gray', 'text' => 'UNKNOWN', 'icon' => '⚪'];
+        $defaultStatus = ['color' => 'gray', 'text' => 'UNKNOWN', 'icon' => '⚪', 'bgClass' => 'bg-gray-100 dark:bg-gray-900/30', 'textClass' => 'text-gray-700', 'scoreClass' => 'text-gray-600', 'recBgClass' => 'bg-gray-100'];
+        $statusInfo = $statusMap[$displayStatus] ?? $defaultStatus;
         $statusColor = $statusInfo['color'];
         $statusText = $statusInfo['text'];
         $statusIcon = $statusInfo['icon'];
+        $statusBgClass = $statusInfo['bgClass'];
+        $statusTextClass = $statusInfo['textClass'];
+        $statusScoreClass = $statusInfo['scoreClass'];
+        $statusRecBgClass = $statusInfo['recBgClass'];
         ?>
 
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 card-hover">
             <!-- Header Status -->
-            <div class="bg-<?= $statusColor ?>-100 dark:bg-<?= $statusColor ?>-900/30 p-4 rounded-lg mb-6">
+            <div class="<?= $statusBgClass ?> p-4 rounded-lg mb-6">
                 <div class="flex items-center justify-between">
                     <div>
                         <div class="text-3xl mb-1"><?= $statusIcon ?></div>
-                        <p class="font-bold text-<?= $statusColor ?>-700 text-lg">Status: <?= $statusText ?></p>
+                        <p class="font-bold <?= $statusTextClass ?> text-lg">Status: <?= $statusText ?></p>
                     </div>
                     <div class="text-right">
-                        <div class="text-3xl font-bold text-<?= $statusColor ?>-600"><?= $scan['safety_score'] ?>/100</div>
+                        <div class="text-3xl font-bold <?= $statusScoreClass ?>"><?= $score ?>/100</div>
                         <div class="text-sm text-gray-500 dark:text-gray-400">Skor Keamanan</div>
                         <?php if ($displayStatus === 'safe'): ?>
                             <div class="text-xs text-green-600 mt-1">Skor > 90 = Aman</div>
@@ -185,7 +211,7 @@ if (!empty($scan['engine_results'])) {
                 </div>
 
                 <!-- Rekomendasi -->
-                <div class="p-3 rounded-lg bg-<?= $statusColor ?>-100">
+                <div class="p-3 rounded-lg <?= $statusRecBgClass ?>">
                     <p class="font-medium text-sm">
                         <?php if ($displayStatus == 'malicious'): ?>
                             ⚠️ PERINGATAN: Link ini telah dilaporkan berbahaya oleh beberapa engine antivirus. JANGAN dibuka!
@@ -247,7 +273,6 @@ if (!empty($scan['engine_results'])) {
                 <!-- Tombol Aksi -->
                 <div class="flex flex-wrap gap-3 pt-4">
                     <a href="index.php" class="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 py-2 rounded-lg btn-hover shadow-sm text-sm">🔄 Scan Baru</a>
-                    <a href="history.php" class="bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg transition text-sm">📋 Kembali ke Riwayat</a>
                     <button onclick="downloadPDF()" class="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white px-4 py-2 rounded-lg btn-hover shadow-sm text-sm">📄 Download PDF</button>
                 </div>
 
@@ -262,7 +287,7 @@ if (!empty($scan['engine_results'])) {
              id: <?= $scan['id'] ?>,
              url: <?= json_encode($scan['url']) ?>,
              scanned_at: <?= json_encode($scan['scanned_at']) ?>,
-             safety_score: <?= (int)$scan['safety_score'] ?>,
+             safety_score: <?= $score ?>,
              status: <?= json_encode($scan['status']) ?>,
              malicious_count: <?= (int)$scan['malicious_count'] ?>,
              suspicious_count: <?= (int)$scan['suspicious_count'] ?>,

@@ -27,6 +27,28 @@ if (defined('VT_API_KEY') && VT_API_KEY && VT_API_KEY != 'MASUKKAN_API_KEY_ANDA_
 // Check 3: URLScan API Key
 if (defined('URLSCAN_API_KEY') && URLSCAN_API_KEY && URLSCAN_API_KEY != 'MASUKKAN_API_KEY_URLSCAN_ANDA_DISINI') {
     $success[] = "✅ URLScan API key configured";
+    // Test API key dengan request ke URLScan
+    $testCh = curl_init();
+    curl_setopt($testCh, CURLOPT_URL, 'https://urlscan.io/api/v1/scan/');
+    curl_setopt($testCh, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($testCh, CURLOPT_POST, true);
+    curl_setopt($testCh, CURLOPT_POSTFIELDS, json_encode(['url' => 'https://example.com', 'visibility' => 'unlisted']));
+    curl_setopt($testCh, CURLOPT_HTTPHEADER, ['Content-Type: application/json', 'API-Key: ' . URLSCAN_API_KEY]);
+    curl_setopt($testCh, CURLOPT_TIMEOUT, 10);
+    curl_setopt($testCh, CURLOPT_SSL_VERIFYPEER, true);
+    $testResponse = curl_exec($testCh);
+    $testHttpCode = curl_getinfo($testCh, CURLINFO_HTTP_CODE);
+    curl_close($testCh);
+    
+    if ($testHttpCode == 200) {
+        $success[] = "✅ URLScan API key valid (API merespon dengan 200)";
+    } elseif ($testHttpCode == 401 || $testHttpCode == 403) {
+        $warnings[] = "⚠️ URLScan API key tidak valid atau revoked (HTTP $testHttpCode). Screenshot tidak akan berfungsi.";
+    } elseif ($testHttpCode == 429) {
+        $warnings[] = "⚠️ URLScan API rate limit tercapai (HTTP 429). Screenshot mungkin gagal.";
+    } else {
+        $warnings[] = "⚠️ URLScan API merespon dengan HTTP $testHttpCode. Screenshot mungkin tidak berfungsi.";
+    }
 } else {
     $warnings[] = "⚠️ URLScan API key not configured (screenshots won't work)";
 }
